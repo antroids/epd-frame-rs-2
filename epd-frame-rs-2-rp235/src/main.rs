@@ -1,33 +1,26 @@
 #![no_std]
 #![no_main]
+#![feature(impl_trait_in_assoc_type)]
+#![feature(type_alias_impl_trait)]
+
 extern crate alloc;
+pub mod device;
 
+use defmt::{info, Debug2Format};
 use embassy_executor::Spawner;
-use embassy_rp::bind_interrupts;
-use embassy_rp::peripherals::{PIO0, TRNG};
-use embassy_rp::pio::{InterruptHandler};
 use embassy_time::{Duration, Timer};
-use defmt::{error, info, unwrap, warn};
-use {defmt_rtt as _, panic_probe as _};
 use embedded_alloc::LlffHeap;
+use epd_frame_rs_2_common::device::Device;
 
-bind_interrupts!(pub struct Irqs {
-    PIO0_IRQ_0 => InterruptHandler<PIO0>;
-    TRNG_IRQ => embassy_rp::trng::InterruptHandler<TRNG>;
-});
-
-unsafe extern "C" {
-    // Flash storage used for configuration
-    static __config_start: u32;
-    static __config_length: u32;
-}
+use defmt_rtt as _;
+use panic_probe as _;
 
 #[global_allocator]
 static HEAP: LlffHeap = LlffHeap::empty();
-const HEAP_SIZE: usize = 1024 * 32;
+const HEAP_SIZE: usize = 1024 * 224;
 
 #[embassy_executor::main]
-async fn main(_spawner: Spawner) -> ! {
+async fn main(spawner: Spawner) -> ! {
     // Initialize the allocator BEFORE you use it
     {
         use core::mem::MaybeUninit;
@@ -35,7 +28,12 @@ async fn main(_spawner: Spawner) -> ! {
         unsafe { HEAP.init(&raw mut HEAP_MEM as usize, HEAP_SIZE) }
     }
 
+    let mut device = device::Rp235Device::new(spawner).await.unwrap();
 
+    spawner.spawn(resources_reporter_task().unwrap());
+    device.run(spawner.clone()).await;
+
+    info!("Hello world!");
     let delay = Duration::from_millis(2000);
     loop {
         info!("led on!");
@@ -58,3 +56,22 @@ pub static PICOTOOL_ENTRIES: [embassy_rp::binary_info::EntryAddr; 4] = [
     embassy_rp::binary_info::rp_cargo_version!(),
     embassy_rp::binary_info::rp_program_build_attribute!(),
 ];
+
+#[embassy_executor::task]
+async fn resources_reporter_task() {
+    loop {
+        info!(
+            "Resources report core {}: memory used {:?} / free {:?} \n{:?} \n{:?} \n{:?} \n{:?} \n{:?} \n{:?}",
+            embassy_rp::multicore::current_core(),
+            HEAP.used(),
+            HEAP.free(),
+            Debug2Format(&embassy_rp::pac::POWMAN.state().read()),
+            Debug2Format(&embassy_rp::pac::POWMAN.current_pwrup_req().read()),
+            Debug2Format(&embassy_rp::pac::POWMAN.last_swcore_pwrup().read()),
+            Debug2Format(&embassy_rp::pac::POWMAN.badpasswd().read()),
+            Debug2Format(&embassy_rp::pac::POWMAN.timer().read()),
+            Debug2Format(&embassy_rp::pac::POWMAN.chip_reset().read()),
+        );
+        Timer::after_secs(5).await;
+    }
+}

@@ -2,115 +2,81 @@
 //! Generated from an OAS specification by openapi-model-generator(v0.6.0)
 //!
 
-use crate::display;
-use alloc::collections::BTreeMap;
-use alloc::string::String;
+use crate::display::weather;
 use alloc::vec::Vec;
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{FixedOffset, NaiveDate, NaiveDateTime};
 use core::fmt::{Display, Formatter};
 use defmt::Format;
-use defmt_or_log::derive_format_or_debug;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 
 /// For each selected weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
 #[derive(Clone, Deserialize, Debug)]
 pub struct HourlyWeather {
     pub time: Vec<DateTime>,
-    pub temperature_2m: Option<Vec<f64>>,
-    pub relative_humidity_2m: Option<Vec<f64>>,
-    pub dew_point_2m: Option<Vec<f64>>,
-    pub apparent_temperature: Option<Vec<f64>>,
-    pub pressure_msl: Option<Vec<f64>>,
-    pub cloud_cover: Option<Vec<f64>>,
-    pub cloud_cover_low: Option<Vec<f64>>,
-    pub cloud_cover_mid: Option<Vec<f64>>,
-    pub cloud_cover_high: Option<Vec<f64>>,
-    pub wind_speed_10m: Option<Vec<f64>>,
-    pub wind_speed_80m: Option<Vec<f64>>,
-    pub wind_speed_120m: Option<Vec<f64>>,
-    pub wind_speed_180m: Option<Vec<f64>>,
-    pub wind_direction_10m: Option<Vec<f64>>,
-    pub wind_direction_80m: Option<Vec<f64>>,
-    pub wind_direction_120m: Option<Vec<f64>>,
-    pub wind_direction_180m: Option<Vec<f64>>,
-    pub wind_gusts_10m: Option<Vec<f64>>,
-    pub shortwave_radiation: Option<Vec<f64>>,
-    pub direct_radiation: Option<Vec<f64>>,
-    pub direct_normal_irradiance: Option<Vec<f64>>,
-    pub diffuse_radiation: Option<Vec<f64>>,
-    pub vapour_pressure_deficit: Option<Vec<f64>>,
-    pub evapotranspiration: Option<Vec<f64>>,
-    pub precipitation: Option<Vec<f64>>,
-    pub weather_code: Option<Vec<f64>>,
-    pub snow_height: Option<Vec<f64>>,
-    pub freezing_level_height: Option<Vec<f64>>,
-    pub soil_temperature_0cm: Option<Vec<f64>>,
-    pub soil_temperature_6cm: Option<Vec<f64>>,
-    pub soil_temperature_18cm: Option<Vec<f64>>,
-    pub soil_temperature_54cm: Option<Vec<f64>>,
-    pub soil_moisture_0_1cm: Option<Vec<f64>>,
-    pub soil_moisture_1_3cm: Option<Vec<f64>>,
-    pub soil_moisture_3_9cm: Option<Vec<f64>>,
-    pub soil_moisture_9_27cm: Option<Vec<f64>>,
-    pub soil_moisture_27_81cm: Option<Vec<f64>>,
+    pub temperature_2m: Vec<f32>,
+    pub relative_humidity_2m: Vec<f32>,
+    pub apparent_temperature: Vec<f32>,
+    pub cloud_cover: Vec<f32>,
+    pub wind_speed_10m: Vec<f32>,
+    pub wind_direction_10m: Vec<f32>,
+    pub wind_gusts_10m: Vec<f32>,
+    pub precipitation: Vec<f32>,
+    pub precipitation_probability: Vec<u32>,
+    pub weather_code: Vec<WeatherCode>,
+    pub is_day: Vec<u8>,
 }
 
 /// For each selected daily weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
 #[derive(Clone, Deserialize, Debug)]
 pub struct DailyWeather {
     pub time: Vec<NaiveDate>,
-    pub temperature_2m_max: Option<Vec<f64>>,
-    pub temperature_2m_min: Option<Vec<f64>>,
-    pub apparent_temperature_max: Option<Vec<f64>>,
-    pub apparent_temperature_min: Option<Vec<f64>>,
-    pub precipitation_sum: Option<Vec<f64>>,
-    pub precipitation_hours: Option<Vec<f64>>,
-    pub weather_code: Option<Vec<f64>>,
-    pub sunrise: Option<Vec<f64>>,
-    pub sunset: Option<Vec<f64>>,
-    pub wind_speed_10m_max: Option<Vec<f64>>,
-    pub wind_gusts_10m_max: Option<Vec<f64>>,
-    pub wind_direction_10m_dominant: Option<Vec<f64>>,
-    pub shortwave_radiation_sum: Option<Vec<f64>>,
-    pub uv_index_max: Option<Vec<f64>>,
-    pub uv_index_clear_sky_max: Option<Vec<f64>>,
-    pub et0_fao_evapotranspiration: Option<Vec<f64>>,
+    pub temperature_2m_max: Vec<f32>,
+    pub temperature_2m_min: Vec<f32>,
+    pub apparent_temperature_max: Vec<f32>,
+    pub apparent_temperature_min: Vec<f32>,
+    pub precipitation_sum: Vec<f32>,
+    pub precipitation_probability_max: Vec<u32>,
+    pub weather_code: Vec<WeatherCode>,
+    pub wind_speed_10m_max: Vec<f32>,
+    pub wind_gusts_10m_max: Vec<f32>,
+    pub wind_direction_10m_dominant: Vec<f32>,
 }
 
 /// Current weather conditions with the attributes: time, temperature, wind_speed, wind_direction and weather_code
 #[derive(Clone, Deserialize, Debug)]
 pub struct CurrentWeather {
     pub time: DateTime,
-    pub temperature_2m: f64,
-    pub windspeed: Option<f64>,
-    pub winddirection: Option<f64>,
-    pub weather_code: i64,
+    pub temperature_2m: f32,
+    pub apparent_temperature: f32,
+    pub relative_humidity_2m: u16,
+    pub wind_speed_10m: f32,
+    pub wind_direction_10m: f32,
+    pub wind_gusts_10m: f32,
+    pub precipitation: f32,
+    pub cloud_cover: f32,
+    pub weather_code: WeatherCode,
+    pub is_day: u8,
 }
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct Response {
-    pub latitude: Option<f64>,
-    pub longitude: Option<f64>,
-    pub elevation: Option<f32>,
-    pub generationtime_ms: Option<f64>,
-    pub utc_offset_seconds: Option<i32>,
-    pub timezone: Option<String>,
-    pub timezone_abbreviation: Option<String>,
-    pub current_units: Option<BTreeMap<String, String>>,
-    pub current: Option<CurrentWeather>,
-    pub hourly_units: Option<BTreeMap<String, String>>,
-    pub hourly: Option<HourlyWeather>,
-    pub daily_units: Option<BTreeMap<String, String>>,
-    pub daily: Option<DailyWeather>,
+    pub latitude: f32,
+    pub longitude: f32,
+    pub elevation: f32,
+    pub generationtime_ms: f32,
+    pub utc_offset_seconds: i32,
+    pub current: CurrentWeather,
+    pub hourly: HourlyWeather,
+    pub daily: DailyWeather,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct DateTime(pub NaiveDateTime);
 
-impl<'de> ::serde::de::Deserialize<'de> for DateTime {
+impl<'de> serde::de::Deserialize<'de> for DateTime {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
         deserializer
             .deserialize_str(DateTimeVisitor)
@@ -120,7 +86,7 @@ impl<'de> ::serde::de::Deserialize<'de> for DateTime {
 
 pub struct DateTimeVisitor;
 
-impl<'a> ::serde::de::Visitor<'a> for DateTimeVisitor {
+impl<'a> serde::de::Visitor<'a> for DateTimeVisitor {
     type Value = NaiveDateTime;
     fn expecting(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.write_fmt(format_args!(
@@ -128,21 +94,20 @@ impl<'a> ::serde::de::Visitor<'a> for DateTimeVisitor {
             "%y-%m-%dT%H:%M"
         ))
     }
-    fn visit_str<E: ::serde::de::Error>(self, value: &str) -> Result<NaiveDateTime, E> {
+    fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<NaiveDateTime, E> {
         NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M").map_err(E::custom)
     }
 }
 
 impl DateTimeVisitor {
-    pub fn deserialize<'a, D: ::serde::Deserializer<'a>>(
+    pub fn deserialize<'a, D: serde::Deserializer<'a>>(
         deserializer: D,
     ) -> Result<NaiveDateTime, D::Error> {
         deserializer.deserialize_str(Self)
     }
 }
 
-#[derive(Deserialize)]
-#[derive_format_or_debug]
+#[derive(Deserialize, Debug, Clone, Copy, Eq, PartialEq)]
 #[serde(try_from = "u8")]
 #[repr(u8)]
 pub enum WeatherCode {
@@ -234,69 +199,145 @@ impl TryFrom<u8> for WeatherCode {
 }
 
 impl WeatherCode {
-    pub fn into_day_icon(self) -> display::weather::Icon {
+    pub fn into_day_icon(self) -> weather::Icon64 {
         match self {
-            WeatherCode::ClearSky => display::weather::Icon::ClearDay,
-            WeatherCode::MainlyClear => display::weather::Icon::PartlyCloudyDay,
-            WeatherCode::PartlyClear => display::weather::Icon::PartlyCloudyDay,
-            WeatherCode::Overcast => display::weather::Icon::Cloudy,
-            WeatherCode::Fog => display::weather::Icon::Fog,
-            WeatherCode::DepositingRimeFog => display::weather::Icon::Fog,
-            WeatherCode::LightDrizzle => display::weather::Icon::Rain,
-            WeatherCode::ModerateDrizzle => display::weather::Icon::Rain,
-            WeatherCode::DenseDrizzle => display::weather::Icon::Rain,
-            WeatherCode::LightFreezingDrizzle => display::weather::Icon::RainSnow,
-            WeatherCode::DenseFreezingDrizzle => display::weather::Icon::RainSnow,
-            WeatherCode::SlightRain => display::weather::Icon::Rain,
-            WeatherCode::ModerateRain => display::weather::Icon::Rain,
-            WeatherCode::HeavyRain => display::weather::Icon::ShowersDay,
-            WeatherCode::SlightFreezingRain => display::weather::Icon::RainSnowShowersDay,
-            WeatherCode::HeavyFreezingRain => display::weather::Icon::RainSnowShowersDay,
-            WeatherCode::SlightSnow => display::weather::Icon::Snow,
-            WeatherCode::ModerateSnow => display::weather::Icon::Snow,
-            WeatherCode::HeavySnow => display::weather::Icon::Snow,
-            WeatherCode::SnowGrains => display::weather::Icon::Hail,
-            WeatherCode::SlightRainShowers => display::weather::Icon::ShowersDay,
-            WeatherCode::ModerateRainShowers => display::weather::Icon::ShowersDay,
-            WeatherCode::ViolentRainShowers => display::weather::Icon::ShowersDay,
-            WeatherCode::SlightSnowShowers => display::weather::Icon::SnowShowersDay,
-            WeatherCode::HeavySnowShowers => display::weather::Icon::SnowShowersDay,
-            WeatherCode::Thunderstorm => display::weather::Icon::Thunder,
-            WeatherCode::ThunderstormSlightHail => display::weather::Icon::ThunderShowersDay,
-            WeatherCode::ThunderstormHeavyHail => display::weather::Icon::ThunderShowersDay,
+            WeatherCode::ClearSky => weather::Icon64::ClearDay,
+            WeatherCode::MainlyClear => weather::Icon64::PartlyCloudyDay,
+            WeatherCode::PartlyClear => weather::Icon64::PartlyCloudyDay,
+            WeatherCode::Overcast => weather::Icon64::Cloudy,
+            WeatherCode::Fog => weather::Icon64::Fog,
+            WeatherCode::DepositingRimeFog => weather::Icon64::Fog,
+            WeatherCode::LightDrizzle => weather::Icon64::Rain,
+            WeatherCode::ModerateDrizzle => weather::Icon64::Rain,
+            WeatherCode::DenseDrizzle => weather::Icon64::Rain,
+            WeatherCode::LightFreezingDrizzle => weather::Icon64::RainSnow,
+            WeatherCode::DenseFreezingDrizzle => weather::Icon64::RainSnow,
+            WeatherCode::SlightRain => weather::Icon64::Rain,
+            WeatherCode::ModerateRain => weather::Icon64::Rain,
+            WeatherCode::HeavyRain => weather::Icon64::ShowersDay,
+            WeatherCode::SlightFreezingRain => weather::Icon64::RainSnowShowersDay,
+            WeatherCode::HeavyFreezingRain => weather::Icon64::RainSnowShowersDay,
+            WeatherCode::SlightSnow => weather::Icon64::Snow,
+            WeatherCode::ModerateSnow => weather::Icon64::Snow,
+            WeatherCode::HeavySnow => weather::Icon64::Snow,
+            WeatherCode::SnowGrains => weather::Icon64::Hail,
+            WeatherCode::SlightRainShowers => weather::Icon64::ShowersDay,
+            WeatherCode::ModerateRainShowers => weather::Icon64::ShowersDay,
+            WeatherCode::ViolentRainShowers => weather::Icon64::ShowersDay,
+            WeatherCode::SlightSnowShowers => weather::Icon64::SnowShowersDay,
+            WeatherCode::HeavySnowShowers => weather::Icon64::SnowShowersDay,
+            WeatherCode::Thunderstorm => weather::Icon64::Thunder,
+            WeatherCode::ThunderstormSlightHail => weather::Icon64::ThunderShowersDay,
+            WeatherCode::ThunderstormHeavyHail => weather::Icon64::ThunderShowersDay,
         }
     }
 
-    pub fn into_night_icon(self) -> display::weather::Icon {
+    pub fn into_night_icon(self) -> weather::Icon64 {
         match self {
-            WeatherCode::ClearSky => display::weather::Icon::ClearNight,
-            WeatherCode::MainlyClear => display::weather::Icon::PartlyCloudyNight,
-            WeatherCode::PartlyClear => display::weather::Icon::PartlyCloudyNight,
-            WeatherCode::Overcast => display::weather::Icon::Cloudy,
-            WeatherCode::Fog => display::weather::Icon::Fog,
-            WeatherCode::DepositingRimeFog => display::weather::Icon::Fog,
-            WeatherCode::LightDrizzle => display::weather::Icon::Rain,
-            WeatherCode::ModerateDrizzle => display::weather::Icon::Rain,
-            WeatherCode::DenseDrizzle => display::weather::Icon::Rain,
-            WeatherCode::LightFreezingDrizzle => display::weather::Icon::RainSnow,
-            WeatherCode::DenseFreezingDrizzle => display::weather::Icon::RainSnow,
-            WeatherCode::SlightRain => display::weather::Icon::Rain,
-            WeatherCode::ModerateRain => display::weather::Icon::Rain,
-            WeatherCode::HeavyRain => display::weather::Icon::ShowersNight,
-            WeatherCode::SlightFreezingRain => display::weather::Icon::RainSnowShowersNight,
-            WeatherCode::HeavyFreezingRain => display::weather::Icon::RainSnowShowersNight,
-            WeatherCode::SlightSnow => display::weather::Icon::Snow,
-            WeatherCode::ModerateSnow => display::weather::Icon::Snow,
-            WeatherCode::HeavySnow => display::weather::Icon::Snow,
-            WeatherCode::SnowGrains => display::weather::Icon::Hail,
-            WeatherCode::SlightRainShowers => display::weather::Icon::ShowersNight,
-            WeatherCode::ModerateRainShowers => display::weather::Icon::ShowersNight,
-            WeatherCode::ViolentRainShowers => display::weather::Icon::ShowersNight,
-            WeatherCode::SlightSnowShowers => display::weather::Icon::SnowShowersNight,
-            WeatherCode::HeavySnowShowers => display::weather::Icon::SnowShowersNight,
-            WeatherCode::Thunderstorm => display::weather::Icon::Thunder,
-            WeatherCode::ThunderstormSlightHail => display::weather::Icon::ThunderShowersNight,
-            WeatherCode::ThunderstormHeavyHail => display::weather::Icon::ThunderShowersNight,
+            WeatherCode::ClearSky => weather::Icon64::ClearNight,
+            WeatherCode::MainlyClear => weather::Icon64::PartlyCloudyNight,
+            WeatherCode::PartlyClear => weather::Icon64::PartlyCloudyNight,
+            WeatherCode::Overcast => weather::Icon64::Cloudy,
+            WeatherCode::Fog => weather::Icon64::Fog,
+            WeatherCode::DepositingRimeFog => weather::Icon64::Fog,
+            WeatherCode::LightDrizzle => weather::Icon64::Rain,
+            WeatherCode::ModerateDrizzle => weather::Icon64::Rain,
+            WeatherCode::DenseDrizzle => weather::Icon64::Rain,
+            WeatherCode::LightFreezingDrizzle => weather::Icon64::RainSnow,
+            WeatherCode::DenseFreezingDrizzle => weather::Icon64::RainSnow,
+            WeatherCode::SlightRain => weather::Icon64::Rain,
+            WeatherCode::ModerateRain => weather::Icon64::Rain,
+            WeatherCode::HeavyRain => weather::Icon64::ShowersNight,
+            WeatherCode::SlightFreezingRain => weather::Icon64::RainSnowShowersNight,
+            WeatherCode::HeavyFreezingRain => weather::Icon64::RainSnowShowersNight,
+            WeatherCode::SlightSnow => weather::Icon64::Snow,
+            WeatherCode::ModerateSnow => weather::Icon64::Snow,
+            WeatherCode::HeavySnow => weather::Icon64::Snow,
+            WeatherCode::SnowGrains => weather::Icon64::Hail,
+            WeatherCode::SlightRainShowers => weather::Icon64::ShowersNight,
+            WeatherCode::ModerateRainShowers => weather::Icon64::ShowersNight,
+            WeatherCode::ViolentRainShowers => weather::Icon64::ShowersNight,
+            WeatherCode::SlightSnowShowers => weather::Icon64::SnowShowersNight,
+            WeatherCode::HeavySnowShowers => weather::Icon64::SnowShowersNight,
+            WeatherCode::Thunderstorm => weather::Icon64::Thunder,
+            WeatherCode::ThunderstormSlightHail => weather::Icon64::ThunderShowersNight,
+            WeatherCode::ThunderstormHeavyHail => weather::Icon64::ThunderShowersNight,
+        }
+    }
+}
+
+impl Response {
+    fn hourly_weather(&self, index: usize, timezone: FixedOffset) -> weather::HourlyWeather {
+        weather::HourlyWeather {
+            time: self.hourly.time[index]
+                .0
+                .and_local_timezone(timezone)
+                .unwrap(),
+            temperature: self.hourly.temperature_2m[index],
+            apparent_temperature: self.hourly.apparent_temperature[index],
+            is_day: self.hourly.is_day[index] != 0,
+            precipitation: self.hourly.precipitation[index],
+            precipitation_probability: self.hourly.precipitation_probability[index]
+                as weather::Percentage,
+            wind_speed: self.hourly.wind_speed_10m[index] as weather::SpeedKilometersPerHour,
+            wind_direction: self.hourly.wind_direction_10m[index] as weather::DirectionDegrees,
+            wind_gusts: self.hourly.wind_gusts_10m[index] as weather::SpeedKilometersPerHour,
+            weather_icon: if self.hourly.is_day[index] != 0 {
+                self.hourly.weather_code[index].into_day_icon()
+            } else {
+                self.hourly.weather_code[index].into_night_icon()
+            },
+        }
+    }
+
+    fn daily_weather(&self, index: usize, _timezone: FixedOffset) -> weather::DailyWeather {
+        weather::DailyWeather {
+            time: self.daily.time[index].and_hms_opt(0, 0, 0).unwrap().date(),
+            temperature_max: self.daily.temperature_2m_max[index],
+            temperature_min: self.daily.temperature_2m_min[index],
+            apparent_temperature_max: self.daily.apparent_temperature_max[index],
+            apparent_temperature_min: self.daily.apparent_temperature_min[index],
+            precipitation: self.daily.precipitation_sum[index],
+            precipitation_probability: self.daily.precipitation_probability_max[index]
+                as weather::Percentage,
+            wind_speed: self.daily.wind_speed_10m_max[index] as weather::SpeedKilometersPerHour,
+            wind_direction: self.daily.wind_direction_10m_dominant[index]
+                as weather::DirectionDegrees,
+            wind_gusts: self.daily.wind_gusts_10m_max[index] as weather::SpeedKilometersPerHour,
+            weather_icon: self.daily.weather_code[index].into_day_icon(),
+        }
+    }
+}
+
+impl From<Response> for weather::Weather {
+    fn from(v: Response) -> Self {
+        let timezone = FixedOffset::east_opt(v.utc_offset_seconds)
+            .unwrap_or_else(|| FixedOffset::east_opt(0).unwrap());
+        let current = weather::CurrentWeather {
+            time: v.current.time.0.and_local_timezone(timezone).unwrap(),
+            temperature: v.current.temperature_2m,
+            apparent_temperature: v.current.apparent_temperature,
+            is_day: v.current.is_day != 0,
+            humidity: v.current.relative_humidity_2m,
+            precipitation: v.current.precipitation,
+            wind_speed: v.current.wind_speed_10m as weather::SpeedKilometersPerHour,
+            wind_direction: v.current.wind_direction_10m as weather::DirectionDegrees,
+            wind_gusts: v.current.wind_gusts_10m as weather::SpeedKilometersPerHour,
+            weather_icon: if v.current.is_day != 0 {
+                v.current.weather_code.into_day_icon()
+            } else {
+                v.current.weather_code.into_night_icon()
+            },
+            cloud_cover: v.current.cloud_cover as weather::Percentage,
+        };
+
+        let hourly = core::array::from_fn(|index| v.hourly_weather(index, timezone));
+        let daily = core::array::from_fn(|index| v.daily_weather(index, timezone));
+
+        Self {
+            current,
+            hourly,
+            daily,
         }
     }
 }
@@ -311,5 +352,13 @@ mod tests {
         let response = include_str!("../../../resources/test/open_meteo/response.json");
         let deserialized: Response = serde_json::from_str(response.trim()).unwrap();
         info!("{:#?}", deserialized);
+    }
+
+    #[test]
+    fn convert_response() {
+        let response = include_str!("../../../resources/test/open_meteo/response.json");
+        let deserialized: Response = serde_json::from_str(response.trim()).unwrap();
+        let weather: weather::Weather = deserialized.into();
+        info!("{:#?}", weather);
     }
 }

@@ -4,17 +4,48 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-embassy-executor = { version = "0.10.0", features = ["executor-thread", "defmt", "executor-interrupt", "platform-cortex-m"] }
-embassy-net = { version = "0.9.0", features = ["dhcpv4", "tcp", "defmt", "udp", "proto-ipv4", "dns"] }
-embassy-rp = { version = "0.10.0", features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl", "binary-info", "rp235xb"] }
+embassy-executor = { workspace = true, features = ["defmt", "executor-thread",
+    "platform-cortex-m", "nightly"] }
+embassy-net = { workspace = true }
+embassy-rp = { version = "0.10.0", features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl",
+    "imagedef-secure-exe", "binary-info", "rp235xa", "rt"] }
 embassy-sync = { version = "0.8.0", features = ["defmt"] }
-embassy-time = { version = "0.5.1", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-time-driver = { version = "0.2.2" }
+embassy-time = { workspace = true, features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-embedded-hal = { version = "0.6.0", features = ["defmt"], default-features = false }
+embassy-futures = { workspace = true, features = ["defmt"] }
 
 embedded-alloc = { version = "0.7.0" }
+embedded-storage-async = { version = "0.4.1", features = [] }
+embedded-graphics = { workspace = true }
 
 cortex-m = { version = "0.7.7", features = ["inline-asm"] }
-cortex-m-rt = "0.7.5"
+cortex-m-rt = { version = "0.7.5", features = [] }
+cyw43 = { version = "0.7.0", features = ["defmt", "firmware-logs"] }
+cyw43-pio = { version = "0.10.0", features = ["defmt"] }
 
 defmt = { workspace = true }
 defmt-rtt = { workspace = true }
 panic-probe = { version = "1.0", features = ["print-defmt"] }
+
+epd-frame-rs-2-common = { workspace = true, features = ["defmt"] }
+
+static_cell = { workspace = true, features = ["nightly"] }
+aligned = { workspace = true }
+zerocopy = { workspace = true }
+
+edge-nal = { version = "0.6.0" }
+edge-dhcp = { version = "0.7.0", features = ["embassy-futures", "embassy-time", "defmt", "io", "edge-nal"], default-features = false }
+edge-nal-embassy = { version = "0.8.1", features = ["defmt"] }
+log = "0.4.29"
+
+[[bin]]
+name = "epd-frame-rs-2-rp235"
+test = false
+bench = false
+
+[profile.dev]
+debug = false
+debug-assertions = true
+opt-level = "s"
+overflow-checks = true

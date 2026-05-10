@@ -1,4 +1,4 @@
-use crate::display::driver::nibbles::{Nibble, Nibbles};
+use crate::display::epd_spectra_6::nibbles::{Nibble, Nibbles};
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use core::time::Duration;
@@ -14,6 +14,8 @@ use embedded_hal::{digital, spi};
 use embedded_hal_async::delay::DelayNs;
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::spi::SpiDevice;
+use mplusfonts::color::{Invert, Screen, WeightedAvg};
+use crate::display::color::E6Color;
 
 pub mod nibbles;
 
@@ -53,83 +55,6 @@ impl Error {
 
     pub fn from_digital_pin_error<ERR: digital::Error>(err: ERR) -> Self {
         Self::DigitalPinError(err.kind())
-    }
-}
-
-pub type DisplayRgbColor = (u8, u8, u8);
-
-const E6_PALETTE: [DisplayRgbColor; 6] = {
-    [
-        (0, 0, 0),
-        (255, 255, 255),
-        (255, 255, 0),
-        (255, 0, 0),
-        (0, 0, 255),
-        (0, 255, 0),
-    ]
-};
-
-#[derive(Format, Copy, Clone, PartialOrd, PartialEq, Debug)]
-#[repr(u8)]
-pub enum E6Color {
-    Black = 0,
-    White = 1,
-    Yellow = 2,
-    Red = 3,
-    Blue = 5,
-    Green = 6,
-}
-
-// Embedded Graphics Impl
-impl PixelColor for E6Color {
-    type Raw = ();
-}
-
-impl From<u8> for E6Color {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => E6Color::Black,
-            1 => E6Color::White,
-            2 => E6Color::Yellow,
-            3 => E6Color::Red,
-            5 => E6Color::Blue,
-            6 => E6Color::Green,
-            _ => panic!("Unknown E6 color index {}", value),
-        }
-    }
-}
-
-impl From<E6Color> for u8 {
-    fn from(value: E6Color) -> Self {
-        value as u8
-    }
-}
-
-impl From<E6Color> for Rgb888 {
-    fn from(value: E6Color) -> Self {
-        let triplet = E6_PALETTE[value as usize];
-        Self::new(triplet.0, triplet.1, triplet.2)
-    }
-}
-
-impl From<Rgb888> for E6Color {
-    fn from(value: Rgb888) -> Self {
-        let color: DisplayRgbColor = (value.r(), value.g(), value.b()).into();
-        for (index, c) in E6_PALETTE.iter().enumerate() {
-            if color == *c {
-                return E6Color::from(index as u8);
-            }
-        }
-        panic!("Invalid E6Color: {:?}", color);
-    }
-}
-
-impl From<BinaryColor> for E6Color {
-    fn from(value: BinaryColor) -> Self {
-        match value {
-            BinaryColor::Off => E6Color::White,
-            BinaryColor::On => E6Color::Black,
-        }
     }
 }
 
@@ -326,7 +251,7 @@ pub(crate) enum DataCommand {
     Command,
 }
 
-pub struct FrameBuffer<S: AsMut<[u8]> + AsRef<[u8]>>(Size, Nibbles<S, E6Color>);
+pub(crate) struct FrameBuffer<S: AsMut<[u8]> + AsRef<[u8]>>(Size, Nibbles<S, E6Color>);
 
 impl FrameBuffer<Vec<u8>> {
     pub fn new(size: Size, color: E6Color) -> Self {
@@ -356,9 +281,12 @@ impl<S: AsMut<[u8]> + AsRef<[u8]>> DrawTarget for FrameBuffer<S> {
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
         let width = self.0.width as usize;
+        let height = self.0.height as usize;
         for Pixel(p, c) in pixels.into_iter().take(self.1.len()) {
-            let pixel_index = p.y as usize * width + p.x as usize;
-            self.1.set(pixel_index, c);
+            if (p.x as usize) < width && (p.y as usize) < height {
+                let pixel_index = p.y as usize * width + p.x as usize;
+                self.1.set(pixel_index, c);
+            }
         }
         Ok(())
     }

@@ -5,6 +5,7 @@ use core::net::{IpAddr, SocketAddr};
 use defmt::{Format, error, info};
 use embassy_net::dns::DnsQueryType;
 use embassy_net::udp::{PacketMetadata, UdpSocket};
+use serde::Deserialize;
 use sntpc::{NtpContext, NtpTimestampGenerator, get_time};
 use sntpc_net_embassy::UdpSocketWrapper;
 use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
@@ -12,7 +13,17 @@ use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 const NTP_LOCAL_SOCKET: u16 = 123;
 
 #[derive(
-    Copy, Clone, IntoBytes, TryFromBytes, Immutable, KnownLayout, Debug, Format, Eq, PartialEq,
+    Copy,
+    Clone,
+    IntoBytes,
+    TryFromBytes,
+    Immutable,
+    KnownLayout,
+    Debug,
+    Format,
+    Eq,
+    PartialEq,
+    Deserialize,
 )]
 #[repr(C)]
 pub struct NtpConfig {

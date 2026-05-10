@@ -1,7 +1,27 @@
+/*
+* The CYW43 Firmware and CLM data must be 4-byte aligned.
+* These parts are not included into the RP Firmware to save time during reflashing.
+*
+* The layout is:
+* 0x10000000 - FLASH1
+* 0x101C0000 - FLASH2
+* 0x10380000 - CYW43FW
+* 0x103BE000 - CYW43CLM
+* 0x103C0000 - CONFIG
+*/
+__firmware_section_length = 1792K;
+__cyw43_firmware_section_length = 248K;
+__cyw43_firmware_length = 230321;
+__cyw43_clm_section_length = 8K;
+__cyw43_clm_length = 4752;
+__config_section_length = 256K;
+
 MEMORY {
-    FLASH : ORIGIN = 0x10000000, LENGTH = 2048K - 128K
-    FLASH2 : ORIGIN = ORIGIN(FLASH) + LENGTH(FLASH), LENGTH = 2048K - 128K
-    CONFIG : ORIGIN = ORIGIN(FLASH2) + LENGTH(FLASH2), LENGTH = 256K
+    FLASH : ORIGIN = 0x10000000, LENGTH = __firmware_section_length
+    FLASH2 : ORIGIN = ORIGIN(FLASH) + LENGTH(FLASH), LENGTH = __firmware_section_length
+    CYW43FW : ORIGIN = ORIGIN(FLASH2) + LENGTH(FLASH2), LENGTH = __cyw43_firmware_section_length
+    CYW43CLM : ORIGIN = ORIGIN(CYW43FW) + LENGTH(CYW43FW), LENGTH = __cyw43_clm_section_length
+    CONFIG : ORIGIN = ORIGIN(CYW43CLM) + LENGTH(CYW43CLM), LENGTH = __config_section_length
 
     RAM : ORIGIN = 0x20000000, LENGTH = 512K
     /*
@@ -14,7 +34,15 @@ MEMORY {
     SRAM5 : ORIGIN = 0x20081000, LENGTH = 4K
 }
 
-__config_start = ORIGIN(CONFIG) - ORIGIN(FLASH);
+__cyw43_firmware_start = ORIGIN(CYW43FW);
+__cyw43_clm_start = ORIGIN(CYW43CLM);
+/*
+* Uploading CYW43 firmware:
+* probe-rs download cyw43-firmware/cyw43439-firmware/43439A0.bin --binary-format bin --chip RP235x --base-address 0x10380000
+* probe-rs download cyw43-firmware/cyw43439-firmware/43439A0_clm.bin --binary-format bin --chip RP235x --base-address 0x103BE000
+*/
+
+__config_start = ORIGIN(CONFIG);
 __config_length = LENGTH(CONFIG);
 
 SECTIONS {

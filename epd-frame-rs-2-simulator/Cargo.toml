@@ -4,17 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+embassy-executor = { workspace = true, features = ["platform-std", "executor-thread", "log"] }
 embassy-time = { version = "0.5.1", features = ["std"], default-features = false }
-epd-frame-rs-2-common = { workspace = true, features = ["log"], default-features = false }
+epd-frame-rs-2-common = { workspace = true, features = ["log", "std"], default-features = false }
 embassy-net = { workspace = true, features = ["medium-ethernet", "medium-ip", "tcp", "udp", "dns", "dhcpv4", "proto-ipv6"], default-features = false }
 embassy-net-tuntap = "0.1.0"
 zerocopy = { workspace = true }
 rand = "0.10.0"
 embedded-graphics = { workspace = true }
 embedded-graphics-simulator = "0.8.0"
-static_cell = { workspace = true }
+static_cell = { workspace = true, features = ["nightly"] }
 heapless = "0.8.0"
-embassy-executor = { version = "0.10.0", features = ["platform-std", "executor-thread", "log"] }
-defmt-or-log = { workspace = true }
+defmt-or-log = { workspace = true, features = ["log"] }
 log = { workspace = true }
 simple-log = { version = "2.4.0" }
+serde_json = { workspace = true }

@@ -1,3 +1,6 @@
+#![feature(type_alias_impl_trait)]
+
+use defmt_or_log::info;
 use crate::device::SimulatorDevice;
 use embassy_executor::Executor;
 use embassy_executor::Spawner;
@@ -20,5 +23,8 @@ fn main() {
 #[embassy_executor::task]
 async fn main_task(spawner: Spawner) {
     let mut device = SimulatorDevice::new(spawner);
-    device.main_loop().await.unwrap();
+    loop {
+        info!("Starting main loop...");
+        device.run(spawner.clone()).await;
+    }
 }

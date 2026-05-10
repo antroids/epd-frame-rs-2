@@ -4,5 +4,5 @@
 channel = "nightly"
 components = ["rustfmt"]
 targets = [
-    "thumbv8m.main-none-eabihf",
+    "x86_64-unknown-linux-gnu",
 ]

@@ -2,6 +2,7 @@ use core::fmt::{Debug, Write};
 use core::net::Ipv4Addr;
 use core::str::{Utf8Error, from_utf8};
 use defmt::{Format, Formatter};
+use serde::Serializer;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, NativeEndian, Usize};
 
 pub const DEFAULT_LIMITED_STRING_MAX_LEN: usize = 32;
@@ -63,10 +64,14 @@ impl<const MAX_LEN: usize> LimitedString<MAX_LEN> {
         Self::from_bytes_truncate(s.as_bytes())
     }
 
+    pub fn from_debug_truncate(d: impl Debug) -> Self {
+        Self::from_str_truncate(alloc::format!("{:?}", d).as_str())
+    }
+
     pub fn from_bytes_truncate(s: &[u8]) -> Self {
-        let len = s.len();
+        let len = s.len().min(MAX_LEN);
         let mut str = [0u8; MAX_LEN];
-        str[..len].copy_from_slice(s);
+        str[..len].copy_from_slice(&s[..len]);
         Self::new(str, len.into())
     }
 
@@ -76,6 +81,25 @@ impl<const MAX_LEN: usize> LimitedString<MAX_LEN> {
 
     pub fn as_utf8_str(&self) -> Result<&str, Utf8Error> {
         from_utf8(self.as_slice())
+    }
+}
+
+impl<'de, const MAX_LEN: usize> serde::Deserialize<'de> for LimitedString<MAX_LEN> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = <&str>::deserialize(deserializer)?;
+        Ok(Self::from_str_truncate(s))
+    }
+}
+
+impl<const MAX_LEN: usize> serde::Serialize for LimitedString<MAX_LEN> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        serializer.serialize_str(self.as_utf8_str().unwrap_or_default())
     }
 }
 
@@ -123,6 +147,16 @@ impl Debug for ByteBool {
     }
 }
 
+impl<'de> serde::Deserialize<'de> for ByteBool {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let b = <bool>::deserialize(deserializer)?;
+        Ok(Self::from_bool(b))
+    }
+}
+
 #[derive(
     Default, Copy, Clone, PartialOrd, PartialEq, Eq, FromBytes, IntoBytes, Immutable, KnownLayout,
 )]
@@ -132,6 +166,15 @@ pub struct Ipv4Address(u8, u8, u8, u8);
 impl Ipv4Address {
     pub fn new(field0: u8, field1: u8, field2: u8, field3: u8) -> Self {
         Self(field0, field1, field2, field3)
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        let mut octets = s.split('.');
+        let a: u8 = octets.next()?.parse().ok()?;
+        let b: u8 = octets.next()?.parse().ok()?;
+        let c: u8 = octets.next()?.parse().ok()?;
+        let d: u8 = octets.next()?.parse().ok()?;
+        Some(Self::new(a, b, c, d))
     }
 }
 
@@ -160,7 +203,19 @@ impl From<Ipv4Address> for Ipv4Addr {
     }
 }
 
-#[derive(Default, Copy, Clone, PartialOrd, PartialEq, Eq, FromBytes, IntoBytes, Immutable, KnownLayout)]
+impl<'de> serde::Deserialize<'de> for Ipv4Address {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = <&str>::deserialize(deserializer)?;
+        Self::parse(s).ok_or_else(|| serde::de::Error::custom("invalid IPv4 address"))
+    }
+}
+
+#[derive(
+    Default, Copy, Clone, PartialOrd, PartialEq, Eq, FromBytes, IntoBytes, Immutable, KnownLayout,
+)]
 #[repr(C)]
 pub struct Ipv4CidrAddress(Ipv4Address, u8);
 
@@ -176,12 +231,23 @@ impl Ipv4CidrAddress {
     pub fn prefix(&self) -> u8 {
         self.1
     }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        let (addr, prefix) = s.split_once('/')?;
+        let prefix: u8 = prefix.parse().ok()?;
+        let mut octets = addr.split('.');
+        let a: u8 = octets.next()?.parse().ok()?;
+        let b: u8 = octets.next()?.parse().ok()?;
+        let c: u8 = octets.next()?.parse().ok()?;
+        let d: u8 = octets.next()?.parse().ok()?;
+        Some(Ipv4CidrAddress::new(Ipv4Address::new(a, b, c, d), prefix))
+    }
 }
 
 impl Format for Ipv4CidrAddress {
     fn format(&self, fmt: Formatter) {
         self.0.format(fmt);
-        defmt::write!(fmt, "{}", self.1)
+        defmt::write!(fmt, "/{}", self.1)
     }
 }
 
@@ -198,3 +264,14 @@ impl From<Ipv4CidrAddress> for embassy_net::Ipv4Cidr {
         embassy_net::Ipv4Cidr::new(value.0.into(), value.1)
     }
 }
+
+impl<'de> serde::Deserialize<'de> for Ipv4CidrAddress {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = <&str>::deserialize(deserializer)?;
+        Self::parse(s).ok_or_else(|| serde::de::Error::custom("invalid IPv4 CIDR address"))
+    }
+}
+

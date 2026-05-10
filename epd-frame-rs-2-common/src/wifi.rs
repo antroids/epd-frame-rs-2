@@ -1,6 +1,7 @@
 use crate::types;
 use crate::types::{ByteBool, LimitedString};
 use defmt::Format;
+use serde::{Deserialize, Serialize};
 use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 
 const MAX_SSID_LEN: usize = 32;
@@ -18,6 +19,7 @@ const MAX_PASSPHRASE_LEN: usize = 64;
     Format,
     PartialEq,
     Eq,
+    Deserialize,
 )]
 #[repr(u8)]
 pub enum Auth {
@@ -41,6 +43,7 @@ pub enum Auth {
     PartialEq,
     Immutable,
     KnownLayout,
+    Deserialize,
 )]
 #[repr(C)]
 pub struct WifiJoinOptions {
@@ -53,7 +56,17 @@ pub struct WifiJoinOptions {
 }
 
 #[derive(
-    Copy, Clone, IntoBytes, TryFromBytes, Immutable, KnownLayout, Debug, Format, Eq, PartialEq,
+    Copy,
+    Clone,
+    IntoBytes,
+    TryFromBytes,
+    Immutable,
+    KnownLayout,
+    Debug,
+    Format,
+    Eq,
+    PartialEq,
+    Deserialize,
 )]
 #[repr(C)]
 pub struct WifiAccessPointOptions {
@@ -71,7 +84,17 @@ impl Default for WifiAccessPointOptions {
 }
 
 #[derive(
-    Copy, Clone, IntoBytes, TryFromBytes, Immutable, KnownLayout, Debug, Format, Eq, PartialEq,
+    Copy,
+    Clone,
+    IntoBytes,
+    TryFromBytes,
+    Immutable,
+    KnownLayout,
+    Debug,
+    Format,
+    Eq,
+    PartialEq,
+    Deserialize,
 )]
 #[repr(C)]
 pub struct NetworkConfig {
@@ -81,17 +104,14 @@ pub struct NetworkConfig {
 
 impl Default for NetworkConfig {
     fn default() -> Self {
-        Self {
-            ipv4_address: types::Ipv4CidrAddress::new(types::Ipv4Address::new(192, 168, 1, 1), 32),
-            dhcp: ByteBool::default(),
-        }
+        Self::static_ipv4()
     }
 }
 
 impl NetworkConfig {
     pub fn static_ipv4() -> Self {
         Self {
-            ipv4_address: types::Ipv4CidrAddress::new(types::Ipv4Address::new(192, 168, 1, 1), 32),
+            ipv4_address: types::Ipv4CidrAddress::new(types::Ipv4Address::new(192, 168, 1, 1), 16),
             dhcp: false.into(),
         }
     }
@@ -105,7 +125,7 @@ impl NetworkConfig {
 }
 
 #[derive(
-    Copy, Clone, IntoBytes, TryFromBytes, Debug, Format, Eq, PartialEq, Immutable, KnownLayout,
+    Copy, Clone, IntoBytes, TryFromBytes, Debug, Format, Eq, PartialEq, Immutable, KnownLayout, Deserialize,
 )]
 #[repr(C)]
 pub struct WifiNetworkScanRecord {
