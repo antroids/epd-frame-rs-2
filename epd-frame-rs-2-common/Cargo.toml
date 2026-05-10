@@ -1,0 +1,16 @@
+[package]
+name = "epd-frame-rs-2-interface"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+defmt = { workspace = true }
+zerocopy = { workspace = true }
+thiserror = { workspace = true }
+nanofish = { workspace = true }
+embassy-net = { workspace = true }
+aligned = { workspace = true }
+
+sntpc = { version = "0.8.0", features = ["defmt"], default-features = false }
+sntpc-net-embassy = { version = "0.8.0", features = ["defmt", "ipv6"], default-features = false }
+chrono = { workspace = true }

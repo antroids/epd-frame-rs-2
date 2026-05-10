@@ -1,0 +1,10 @@
+[target.'cfg(all(target_arch = "arm", target_os = "none"))']
+runner = "probe-rs run --chip RP2040" # for jtag
+# runner = "elf2uf2-rs --deploy --serial --verbose" # for elf2uf2
+rustflags = ["-C", "link-arg=-Tlink.x"]
+
+[build]
+target = "thumbv8m.main-none-eabihf"        # Cortex-M0 and Cortex-M0+
+
+[env]
+DEFMT_LOG = "debug"
