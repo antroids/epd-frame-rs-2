@@ -1,18 +1,23 @@
 use alloc::vec::Vec;
+use core::arch::asm;
 use core::time::Duration;
 use defmt::warn;
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_executor::Spawner;
 use embassy_rp::peripherals::{DMA_CH0, DMA_CH1, DMA_CH2, DMA_CH3, PIO0, SPI1, TRNG};
 use embassy_rp::pio::InterruptHandler;
+use embassy_rp::pwm::SetDutyCycle;
 use embassy_rp::spi::Async;
 use embassy_rp::trng::Trng;
 use embassy_rp::watchdog::Watchdog;
-use embassy_rp::{bind_interrupts, dma, gpio, pac};
+use embassy_rp::{bind_interrupts, dma, gpio, pac, pwm};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
 use embassy_time::{Delay, Timer};
-use epd_frame_rs_2_common::device::{Device, DeviceInput, DeviceInputReceiver};
+use epd_frame_rs_2_common::device::{
+    Device, DeviceIndicator, DeviceIndicatorReceiver, DeviceIndicatorSender, DeviceInput,
+    DeviceInputReceiver, IndicatorState,
+};
 use epd_frame_rs_2_common::errors::DeviceError;
 use epd_frame_rs_2_common::storage::{LastRunStatistics, PersistentState};
 use epd_frame_rs_2_common::types::LimitedString;
@@ -44,6 +49,7 @@ pub struct Rp235Device {
     watchdog: Watchdog,
     display: DisplayDriver<'static>,
     device_input: &'static DeviceInput,
+    device_indicator: &'static DeviceIndicator,
     spawner: Spawner,
     aon_timer: embassy_rp::aon_timer::AonTimer<'static>,
 }
@@ -114,8 +120,16 @@ impl Device for Rp235Device {
         self.device_input.receiver()
     }
 
+    fn indicator_sender(&self) -> DeviceIndicatorSender {
+        self.device_indicator.sender()
+    }
+
     async fn power_off_for(&mut self, duration: Duration) -> Result<(), DeviceError> {
         info!("Powering off the board for {:?}", duration);
+
+        while !self.device_indicator.is_empty() {
+            Timer::after_secs(1).await;
+        }
 
         if !duration.is_zero() {
             info!("Powering off the board for {} seconds", duration.as_secs());
@@ -133,9 +147,7 @@ impl Device for Rp235Device {
         defmt::flush();
 
         low_power_mode();
-        //embassy_rp::clocks::dormant_sleep();
         self.aon_timer.wait_for_alarm().await;
-        //self.reset().await?;
 
         Ok(())
     }
@@ -214,8 +226,13 @@ impl Rp235Device {
         let spi_device = SpiDevice::new(display_spi, display_cs);
         let display = DisplayDriver::new(spi_device, display_dc, display_rst, display_busy, Delay);
         let button = gpio::Input::new(peripherals.PIN_18, gpio::Pull::Up);
-        let led = gpio::Output::new(peripherals.PIN_9, gpio::Level::High);
+        let led = pwm::Pwm::new_output_b(
+            peripherals.PWM_SLICE4,
+            peripherals.PIN_9,
+            pwm::Config::default(),
+        );
         let device_input = make_static!(DeviceInput::new());
+        let device_indicator = make_static!(DeviceIndicator::new());
         let aon_timer = embassy_rp::aon_timer::AonTimer::new(
             peripherals.POWMAN,
             Irqs,
@@ -226,8 +243,10 @@ impl Rp235Device {
             },
         );
 
+        info!("PWM max frequency {}", led.max_duty_cycle());
+
         button::spawn_button_task(button, device_input.sender(), &spawner)?;
-        spawner.spawn(blink_led(led)?);
+        spawner.spawn(indicator_led(led, device_indicator.receiver())?);
 
         Ok(Self {
             flash,
@@ -236,6 +255,7 @@ impl Rp235Device {
             watchdog,
             display,
             device_input,
+            device_indicator,
             spawner,
             aon_timer,
         })
@@ -268,6 +288,10 @@ fn low_power_mode() {
         r.set_req(0b00001111);
         r.0 = POWMAN_PASSWORD | (r.0 & 0xFFFF);
     });
+
+    unsafe {
+        asm!("wfi");
+    }
 }
 
 unsafe extern "C" {
@@ -290,5 +314,26 @@ async fn blink_led(mut led: gpio::Output<'static>) {
         Timer::after_millis(500).await;
         led.set_high();
         Timer::after_millis(500).await;
+    }
+}
+
+#[embassy_executor::task]
+async fn indicator_led(mut led: pwm::Pwm<'static>, receiver: DeviceIndicatorReceiver) {
+    loop {
+        let duty_cycle_percent = match receiver.receive().await {
+            IndicatorState::Off => 0,
+            IndicatorState::Loading => 5,
+            IndicatorState::ReadingConfiguration => 10,
+            IndicatorState::WritingConfiguration => 15,
+            IndicatorState::HttpRequest => 20,
+            IndicatorState::JoiningWifi => 25,
+            IndicatorState::StartingWifiAccessPoint => 25,
+            IndicatorState::ConfigurationMode => 30,
+            IndicatorState::RenderingImage => 40,
+            IndicatorState::UpdatingScreen => 50,
+            IndicatorState::Error => 80,
+        };
+
+        let _ = led.set_duty_cycle_percent(duty_cycle_percent);
     }
 }

@@ -6,8 +6,8 @@ use embedded_graphics::prelude::*;
 use embedded_graphics_simulator::sdl2::MouseButton;
 use embedded_graphics_simulator::{OutputSettings, SimulatorDisplay, SimulatorEvent, Window};
 use epd_frame_rs_2_common::device::{
-    DOUBLE_CLICK_MS, Device, DeviceInput, DeviceInputReceiver, DeviceInputSender, Input,
-    LONG_PRESS_MS,
+    DOUBLE_CLICK_MS, Device, DeviceIndicator, DeviceIndicatorSender, DeviceInput,
+    DeviceInputReceiver, DeviceInputSender, Input, LONG_PRESS_MS,
 };
 use epd_frame_rs_2_common::display::color::E6Color;
 use epd_frame_rs_2_common::display::epd_spectra_6::nibbles::Nibbles;
@@ -34,11 +34,13 @@ pub struct SimulatorDevice {
     network_stack: Option<Stack<'static>>,
     spawner: Spawner,
     input: &'static DeviceInput,
+    indicator: &'static DeviceIndicator,
 }
 
 impl SimulatorDevice {
     pub fn new(spawner: Spawner) -> SimulatorDevice {
         let input = make_static!(DeviceInput::new());
+        let indicator = make_static!(DeviceIndicator::new());
         let input_sender = input.sender();
 
         Self {
@@ -46,6 +48,7 @@ impl SimulatorDevice {
             network_stack: None,
             spawner,
             input,
+            indicator,
         }
     }
 }
@@ -156,6 +159,10 @@ impl Device for SimulatorDevice {
         self.input.receiver()
     }
 
+    fn indicator_sender(&self) -> DeviceIndicatorSender {
+        self.indicator.sender()
+    }
+
     async fn power_off_for(&mut self, duration: std::time::Duration) -> Result<(), DeviceError> {
         info!("Powering off for {:?}", duration);
         Ok(())
@@ -172,10 +179,7 @@ impl Device for SimulatorDevice {
             .and_then(|file| serde_json::from_reader(file).ok())
     }
 
-    async fn write_last_run_statistics(
-        &mut self,
-        last_run_statistics: &LastRunStatistics,
-    ) {
+    async fn write_last_run_statistics(&mut self, last_run_statistics: &LastRunStatistics) {
         std::fs::File::open(LAST_RUN_STATISTICS_FILE)
             .unwrap()
             .write_all(serde_json::to_vec(last_run_statistics).unwrap().as_slice())

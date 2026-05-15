@@ -22,6 +22,7 @@ use alloc::{format, vec};
 use chrono::{FixedOffset, Timelike};
 use core::net::{IpAddr, SocketAddr};
 use core::time::Duration;
+use defmt::Format;
 use defmt_or_log::{derive_format_or_debug, error, info};
 use embassy_executor::Spawner;
 use embassy_net::dns::DnsQueryType;
@@ -41,7 +42,6 @@ use mplusfonts_macros::mplus;
 use picoserve::make_static;
 use sntpc::{NtpContext, NtpTimestampGenerator, get_time};
 use sntpc_net_embassy::UdpSocketWrapper;
-use zerocopy::FromBytes;
 
 #[allow(dead_code)]
 const POOL_NTP_ADDR: &str = "pool.ntp.org:123";
@@ -77,6 +77,7 @@ pub trait Device {
     fn rand(&mut self) -> impl Future<Output = u64>;
     fn display(&mut self) -> impl Future<Output = Result<&mut impl DisplayDriver, DeviceError>>;
     fn input_receiver(&self) -> DeviceInputReceiver;
+    fn indicator_sender(&self) -> DeviceIndicatorSender;
     fn power_off_for(
         &mut self,
         duration: Duration,
@@ -95,9 +96,13 @@ pub trait Device {
     }
 
     async fn run(&mut self, spawner: Spawner) {
+        let mut indicator = self.indicator_sender();
+
+        let _ = indicator.try_send(IndicatorState::Loading);
         let last_run_statistics = self.read_last_run_statistics().await.unwrap_or_default();
         info!("Last run statistics: {:?}", last_run_statistics);
         if let Err(e) = self.main_loop(spawner, &last_run_statistics).await {
+            let _ = indicator.try_send(IndicatorState::Error);
             error!("Main loop finished with error: {:?}", e);
             let run_statistics = LastRunStatistics::from_debug(e);
             if last_run_statistics != run_statistics {
@@ -113,6 +118,9 @@ pub trait Device {
         spawner: Spawner,
         last_run_statistics: &LastRunStatistics,
     ) -> Result<(), DeviceError> {
+        let mut indicator = self.indicator_sender();
+
+        let _ = indicator.try_send(IndicatorState::ReadingConfiguration);
         let mut persistent_state = self.read_persistent_state().await.unwrap_or_else(|e| {
             error!(
                 "Persistent state read error: {:?}, falling back to default",
@@ -137,16 +145,26 @@ pub trait Device {
         mut persistent_state: PersistentState,
         last_run_statistics: &LastRunStatistics,
     ) -> Result<(), DeviceError> {
+        let mut indicator = self.indicator_sender();
+
+        let _ = indicator.try_send(IndicatorState::JoiningWifi);
         self.init_network_stack(&persistent_state.wifi_join_network_config)
             .await?;
         self.join_wifi(&persistent_state.wifi_join_options).await?;
 
+        let _ = indicator.try_send(IndicatorState::HttpRequest);
         let mut http_client = self.http_client().await?;
-        let weather = open_meteo::get_weather(&mut http_client, 51.1, 17.039999).await?;
+        let weather = open_meteo::get_weather(
+            &mut http_client,
+            persistent_state.weather_options.latitude,
+            persistent_state.weather_options.longitude,
+        )
+        .await?;
 
         self.leave_wifi().await?;
         self.power_off_radio_module().await?;
 
+        let _ = indicator.try_send(IndicatorState::RenderingImage);
         let seed = self.rand().await;
         let mut rand = fastrand::Rng::with_seed(seed);
         let mut display = self.display().await?;
@@ -159,6 +177,7 @@ pub trait Device {
         display::draw_weather(&mut frame_buffer, &weather, &mut rand).await?;
         display::draw_last_run_statistics(&mut frame_buffer, last_run_statistics).await?;
 
+        let _ = indicator.try_send(IndicatorState::UpdatingScreen);
         display.refresh(frame_buffer.as_bytes()).await?;
         info!("Display refreshed");
 
@@ -169,10 +188,13 @@ pub trait Device {
         let task_scheduler = current_time
             .map(|t| persistent_state.scheduler.task_scheduler(t))
             .unwrap_or_default();
+
+        let _ = indicator.try_send(IndicatorState::WritingConfiguration);
         let run_statistics = LastRunStatistics::successful();
         if run_statistics != *last_run_statistics {
             self.write_last_run_statistics(&run_statistics).await;
         }
+        let _ = indicator.try_send(IndicatorState::Off);
         info!("Powering off for {} minutes", task_scheduler.minutes_delay);
         self.power_off_for(Duration::from_mins(task_scheduler.minutes_delay as u64))
             .await?;
@@ -186,7 +208,9 @@ pub trait Device {
         persistent_state: PersistentState,
         _last_run_statistics: &LastRunStatistics,
     ) -> Result<(), DeviceError> {
+        let mut indicator = self.indicator_sender();
         {
+            let _ = indicator.try_send(IndicatorState::RenderingImage);
             let mut display = self.display().await?;
 
             let mut frame_buffer = FrameBuffer::new(
@@ -200,14 +224,17 @@ pub trait Device {
             )
             .await?;
 
+            let _ = indicator.try_send(IndicatorState::UpdatingScreen);
             display.refresh(frame_buffer.as_bytes()).await?;
         }
 
+        let _ = indicator.try_send(IndicatorState::StartingWifiAccessPoint);
         self.init_network_stack(&persistent_state.wifi_access_point_network_config)
             .await?;
         self.start_wifi_ap(&persistent_state.wifi_access_point_options)
             .await?;
 
+        let _ = indicator.try_send(IndicatorState::ConfigurationMode);
         let action_channel = make_static!(http::server::ActionChannel, Channel::new());
         let seed = self.rand().await;
         let network_stack = self.network_stack().await?.clone();
@@ -233,6 +260,7 @@ pub trait Device {
                             self.write_persistent_state(&state).await?
                         }
                         ServerAction::Restart => {
+                            let _ = indicator.try_send(IndicatorState::Off);
                             self.reset().await?;
                             break;
                         }
@@ -273,6 +301,7 @@ pub trait Device {
 
 #[derive(Clone, Copy)]
 #[derive_format_or_debug]
+#[repr(u8)]
 pub enum Input {
     Button1Click,
     Button1DoubleClick,
@@ -284,3 +313,27 @@ const INPUT_CHANNEL_CAPACITY: usize = 16;
 pub type DeviceInput = Channel<crate::RawMutex, Input, INPUT_CHANNEL_CAPACITY>;
 pub type DeviceInputSender = Sender<'static, crate::RawMutex, Input, INPUT_CHANNEL_CAPACITY>;
 pub type DeviceInputReceiver = Receiver<'static, crate::RawMutex, Input, INPUT_CHANNEL_CAPACITY>;
+
+
+const INDICATOR_STATE_CAPACITY: usize = 16;
+pub type DeviceIndicator = Channel<crate::RawMutex, IndicatorState, INDICATOR_STATE_CAPACITY>;
+pub type DeviceIndicatorSender = Sender<'static, crate::RawMutex, IndicatorState, INDICATOR_STATE_CAPACITY>;
+pub type DeviceIndicatorReceiver = Receiver<'static, crate::RawMutex, IndicatorState, INDICATOR_STATE_CAPACITY>;
+#[derive(Default, Copy, Clone, Debug)]
+#[derive_format_or_debug]
+#[repr(u8)]
+pub enum IndicatorState {
+    #[default]
+    Off,
+    Loading,
+    ReadingConfiguration,
+    WritingConfiguration,
+    HttpRequest,
+    JoiningWifi,
+    StartingWifiAccessPoint,
+    ConfigurationMode,
+    RenderingImage,
+    UpdatingScreen,
+    Error,
+}
+

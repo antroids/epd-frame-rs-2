@@ -102,6 +102,7 @@ pub fn render_page(state: &PersistentState) -> maud::Markup {
     let ap = &state.wifi_access_point_options;
     let ap_net = &state.wifi_access_point_network_config;
     let ntp = &state.ntp_config;
+    let weather = &state.weather_options;
 
     let x_init = alloc::format!(
         "$nextTick(() => {{\
@@ -120,6 +121,8 @@ pub fn render_page(state: &PersistentState) -> maud::Markup {
          state.wifi_access_point_network_config.ipv4_address='{ap_ip}';\
          state.wifi_access_point_network_config.dhcp=false;\
          state.ntp_config.ntp_server='{ntp_server}';\
+         state.weather_options.latitude={latitude};\
+         state.weather_options.longitude={longitude};\
          }})",
         version = state.version,
         connect_to_wifi = state.connect_to_wifi.as_bool(),
@@ -135,6 +138,8 @@ pub fn render_page(state: &PersistentState) -> maud::Markup {
         ap_channel = ap.channel,
         ap_ip = js_str(&alloc::format!("{:?}", ap_net.ipv4_address)),
         ntp_server = js_str(str_from_limited(&ntp.ntp_server)),
+        latitude = weather.latitude,
+        longitude = weather.longitude,
     );
 
     let sched_js = scheduler_table_js(&state.scheduler);
@@ -216,6 +221,7 @@ pub fn render_page(state: &PersistentState) -> maud::Markup {
                                 wifi_access_point_options: { ssid: '', channel: 1 },
                                 wifi_access_point_network_config: { ipv4_address: '0.0.0.0/0', dhcp: false },
                                 ntp_config: { ntp_server: '' },
+                                weather_options: { latitude: 0.0, longitude: 0.0 },
                                 scheduler: { daily: [] }
                             },
                             bannerClass() {
@@ -323,6 +329,19 @@ pub fn render_page(state: &PersistentState) -> maud::Markup {
                     label {
                         "Server"
                         input type="text" x-model="state.ntp_config.ntp_server";
+                    }
+                }
+
+                // ── Weather ───────────────────────────────────────────────────
+                fieldset {
+                    legend { "Weather" }
+                    label {
+                        "Latitude"
+                        (PreEscaped(r#"<input type="number" step="0.001" min="-90" max="90" x-model.number="state.weather_options.latitude">"#))
+                    }
+                    label {
+                        "Longitude"
+                        (PreEscaped(r#"<input type="number" step="0.001" min="-180" max="180" x-model.number="state.weather_options.longitude">"#))
                     }
                 }
 

@@ -22,6 +22,7 @@ pub struct PersistentState {
     pub wifi_access_point_network_config: NetworkConfig,
     pub ntp_config: NtpConfig,
     pub scheduler: WeeklyScheduler,
+    pub weather_options: WeatherOptions,
 }
 
 impl Default for PersistentState {
@@ -35,6 +36,7 @@ impl Default for PersistentState {
             wifi_access_point_network_config: NetworkConfig::static_ipv4(),
             ntp_config: Default::default(),
             scheduler: Default::default(),
+            weather_options: Default::default(),
         }
     }
 }
@@ -73,6 +75,28 @@ impl LastRunStatistics {
             failed_cause: LimitedString::from_debug_truncate(debug),
         }
     }
+}
+
+pub const COORDINATES_SCALE: f32 = 1000.0;
+
+#[derive(
+    Debug,
+    Format,
+    IntoBytes,
+    TryFromBytes,
+    Copy,
+    Clone,
+    Immutable,
+    KnownLayout,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    Default
+)]
+#[repr(C, align(4))]
+pub struct WeatherOptions {
+    pub latitude: f32,
+    pub longitude: f32,
 }
 
 #[derive(

@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 pub mod models;
 
-pub fn request_url(latitude: f64, longitude: f64) -> String {
+pub fn request_url(latitude: f32, longitude: f32) -> String {
     format!(
         "http://api.open-meteo.com/v1/forecast?latitude={}&longitude={}\
         &daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,\
@@ -27,8 +27,8 @@ pub fn request_url(latitude: f64, longitude: f64) -> String {
 
 pub async fn get_weather(
     client: &mut http::client::HttpClient,
-    latitude: f64,
-    longitude: f64,
+    latitude: f32,
+    longitude: f32,
 ) -> Result<Weather, DeviceError> {
     let mut response_buffer = vec![0; 1024 * 8];
     let headers = [
