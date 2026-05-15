@@ -16,7 +16,7 @@ use embassy_sync::mutex::Mutex;
 use embassy_time::{Delay, Timer};
 use epd_frame_rs_2_common::device::{
     Device, DeviceIndicator, DeviceIndicatorReceiver, DeviceIndicatorSender, DeviceInput,
-    DeviceInputReceiver, IndicatorState,
+    DeviceInputReceiver, DeviceInterface, IndicatorState,
 };
 use epd_frame_rs_2_common::errors::DeviceError;
 use epd_frame_rs_2_common::storage::{LastRunStatistics, PersistentState};
@@ -54,7 +54,7 @@ pub struct Rp235Device {
     aon_timer: embassy_rp::aon_timer::AonTimer<'static>,
 }
 
-impl Device for Rp235Device {
+impl DeviceInterface for Rp235Device {
     async fn read_persistent_state(&mut self) -> Result<PersistentState, DeviceError> {
         self.flash.try_read_persistent_state().await
     }
@@ -171,6 +171,8 @@ impl Device for Rp235Device {
             .await;
     }
 }
+
+impl Device for Rp235Device {}
 
 impl Rp235Device {
     pub async fn new(spawner: Spawner) -> Result<Self, DeviceError> {

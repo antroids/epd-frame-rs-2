@@ -31,7 +31,6 @@ pub struct HttpClient {
     >,
     dns_client: embassy_net::dns::DnsSocket<'static>,
     stack: embassy_net::Stack<'static>,
-    seed: u64,
 }
 
 impl HttpClient {
@@ -42,7 +41,6 @@ impl HttpClient {
             tcp_client_state,
             dns_client,
             stack,
-            seed,
         }
     }
 

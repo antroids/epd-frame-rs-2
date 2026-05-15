@@ -7,7 +7,7 @@ use embedded_graphics_simulator::sdl2::MouseButton;
 use embedded_graphics_simulator::{OutputSettings, SimulatorDisplay, SimulatorEvent, Window};
 use epd_frame_rs_2_common::device::{
     DOUBLE_CLICK_MS, Device, DeviceIndicator, DeviceIndicatorSender, DeviceInput,
-    DeviceInputReceiver, DeviceInputSender, Input, LONG_PRESS_MS,
+    DeviceInputReceiver, DeviceInputSender, DeviceInterface, Input, LONG_PRESS_MS,
 };
 use epd_frame_rs_2_common::display::color::E6Color;
 use epd_frame_rs_2_common::display::epd_spectra_6::nibbles::Nibbles;
@@ -53,7 +53,7 @@ impl SimulatorDevice {
     }
 }
 
-impl Device for SimulatorDevice {
+impl DeviceInterface for SimulatorDevice {
     async fn read_persistent_state(&mut self) -> Result<PersistentState, DeviceError> {
         let mut buf = vec![];
         let mut file = std::fs::File::open(PERSISTENT_STATE_FILE).map_err(|e| {
@@ -186,6 +186,8 @@ impl Device for SimulatorDevice {
             .unwrap();
     }
 }
+
+impl Device for SimulatorDevice {}
 
 pub struct SimulatorDeviceDisplay(SimulatorDisplay<E6Color>, DeviceInputSender);
 
