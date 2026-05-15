@@ -1,5 +1,5 @@
 use crate::display::color::E6Color;
-use defmt_or_log::{info, warn};
+use defmt_or_log::warn;
 use embedded_graphics::Pixel;
 use embedded_graphics::prelude::{DrawTarget, Point};
 use zerocopy::{FromBytes, Immutable, KnownLayout};

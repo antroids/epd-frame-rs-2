@@ -9,7 +9,7 @@ use embedded_graphics::Pixel;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::{Point, Size};
 use embedded_graphics::pixelcolor::BinaryColor;
-use embedded_graphics::prelude::{Dimensions, PixelColor};
+use embedded_graphics::prelude::Dimensions;
 use embedded_graphics::primitives::{
     CornerRadii, PrimitiveStyle, Rectangle, RoundedRectangle, StyledDrawable,
 };

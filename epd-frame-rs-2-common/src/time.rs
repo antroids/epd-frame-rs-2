@@ -1,8 +1,8 @@
 use crate::errors::DeviceError;
 use crate::types;
-use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use core::net::{IpAddr, SocketAddr};
-use defmt::{Format, error, info};
+use defmt::{Format, error};
 use embassy_net::dns::DnsQueryType;
 use embassy_net::udp::{PacketMetadata, UdpSocket};
 use serde::Deserialize;

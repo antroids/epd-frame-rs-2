@@ -1,27 +1,19 @@
-use crate::display::epd_spectra_6::nibbles::{Nibble, Nibbles};
+use crate::display::epd_spectra_6::nibbles::Nibbles;
 use alloc::vec::Vec;
-use core::marker::PhantomData;
-use core::time::Duration;
 use defmt::{info, Format};
 use embedded_graphics::Pixel;
 use embedded_graphics::geometry::Size;
-use embedded_graphics::pixelcolor::{BinaryColor, PixelColor, Rgb888};
-use embedded_graphics::prelude::{Dimensions, DrawTarget, OriginDimensions, RgbColor};
-use embedded_graphics::primitives::Rectangle;
+use embedded_graphics::prelude::{DrawTarget, OriginDimensions};
 use embedded_hal::digital::{OutputPin, PinState};
-use embedded_hal::spi::Operation;
 use embedded_hal::{digital, spi};
 use embedded_hal_async::delay::DelayNs;
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::spi::SpiDevice;
-use mplusfonts::color::{Invert, Screen, WeightedAvg};
 use crate::display::color::E6Color;
 
 pub mod nibbles;
 
 const RESET_DELAY_MS: u32 = 30;
-const BUSY_WAIT_DELAY_MS: u32 = 100;
-const BUSY_WAIT_TIMEOUT_MS: Duration = Duration::from_millis(20_000);
 const INIT_SEQUENCE: &[(CommandCode, &[u8])] = &[
     (CommandCode::INIT, &[0x49, 0x55, 0x20, 0x08, 0x09, 0x18]),
     (CommandCode::PWR, &[0x3F]),
@@ -251,7 +243,7 @@ pub(crate) enum DataCommand {
     Command,
 }
 
-pub(crate) struct FrameBuffer<S: AsMut<[u8]> + AsRef<[u8]>>(Size, Nibbles<S, E6Color>);
+pub struct FrameBuffer<S: AsMut<[u8]> + AsRef<[u8]>>(Size, Nibbles<S, E6Color>);
 
 impl FrameBuffer<Vec<u8>> {
     pub fn new(size: Size, color: E6Color) -> Self {

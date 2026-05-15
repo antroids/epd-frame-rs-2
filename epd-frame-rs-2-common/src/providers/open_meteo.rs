@@ -1,12 +1,8 @@
-use crate::device::Device;
 use crate::display::weather::Weather;
 use crate::errors::DeviceError;
 use crate::http;
 use alloc::string::String;
 use alloc::{format, vec};
-use core::fmt::Display;
-use defmt::Format;
-use serde::Deserialize;
 
 pub mod models;
 

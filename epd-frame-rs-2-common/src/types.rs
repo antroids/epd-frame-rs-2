@@ -1,4 +1,4 @@
-use core::fmt::{Debug, Write};
+use core::fmt::Debug;
 use core::net::Ipv4Addr;
 use core::str::{Utf8Error, from_utf8};
 use defmt::{Format, Formatter};
@@ -97,7 +97,7 @@ impl<'de, const MAX_LEN: usize> serde::Deserialize<'de> for LimitedString<MAX_LE
 impl<const MAX_LEN: usize> serde::Serialize for LimitedString<MAX_LEN> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer
+        S: Serializer,
     {
         serializer.serialize_str(self.as_utf8_str().unwrap_or_default())
     }
@@ -274,4 +274,3 @@ impl<'de> serde::Deserialize<'de> for Ipv4CidrAddress {
         Self::parse(s).ok_or_else(|| serde::de::Error::custom("invalid IPv4 CIDR address"))
     }
 }
-

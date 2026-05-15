@@ -23,7 +23,7 @@ pub trait Device: DeviceInterface {
     }
 
     async fn run(&mut self, spawner: Spawner) {
-        let mut indicator = self.indicator_sender();
+        let indicator = self.indicator_sender();
 
         let _ = indicator.try_send(IndicatorState::Loading);
         let last_run_statistics = self.read_last_run_statistics().await.unwrap_or_default();
@@ -46,10 +46,10 @@ pub trait Device: DeviceInterface {
         spawner: Spawner,
         last_run_statistics: &LastRunStatistics,
     ) -> Result<(), DeviceError> {
-        let mut indicator = self.indicator_sender();
+        let indicator = self.indicator_sender();
 
         let _ = indicator.try_send(IndicatorState::ReadingConfiguration);
-        let mut persistent_state = self.read_persistent_state().await.unwrap_or_else(|e| {
+        let persistent_state = self.read_persistent_state().await.unwrap_or_else(|e| {
             error!(
                 "Persistent state read error: {:?}, falling back to default",
                 e
@@ -70,10 +70,10 @@ pub trait Device: DeviceInterface {
 
     async fn online_mode_loop(
         &mut self,
-        mut persistent_state: PersistentState,
+        persistent_state: PersistentState,
         last_run_statistics: &LastRunStatistics,
     ) -> Result<(), DeviceError> {
-        let mut indicator = self.indicator_sender();
+        let indicator = self.indicator_sender();
 
         let _ = indicator.try_send(IndicatorState::JoiningWifi);
         self.init_network_stack(&persistent_state.wifi_join_network_config)
@@ -95,7 +95,7 @@ pub trait Device: DeviceInterface {
         let _ = indicator.try_send(IndicatorState::RenderingImage);
         let seed = self.rand().await;
         let mut rand = fastrand::Rng::with_seed(seed);
-        let mut display = self.display().await?;
+        let display = self.display().await?;
         let mut frame_buffer = FrameBuffer::new(
             Size::new(DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32),
             E6Color::White,
@@ -136,10 +136,10 @@ pub trait Device: DeviceInterface {
         persistent_state: PersistentState,
         _last_run_statistics: &LastRunStatistics,
     ) -> Result<(), DeviceError> {
-        let mut indicator = self.indicator_sender();
+        let indicator = self.indicator_sender();
         {
             let _ = indicator.try_send(IndicatorState::RenderingImage);
-            let mut display = self.display().await?;
+            let display = self.display().await?;
 
             let mut frame_buffer = FrameBuffer::new(
                 Size::new(DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32),

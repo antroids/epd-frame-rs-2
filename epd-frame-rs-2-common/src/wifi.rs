@@ -1,7 +1,7 @@
 use crate::types;
 use crate::types::{ByteBool, LimitedString};
 use defmt::Format;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 
 const MAX_SSID_LEN: usize = 32;

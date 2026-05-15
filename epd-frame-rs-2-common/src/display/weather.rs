@@ -13,10 +13,12 @@ use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::{Primitive, Size};
 use embedded_graphics::primitives::{Line, PrimitiveStyle, StyledDrawable};
 use embedded_graphics::text::Text;
-use micromath::F32Ext;
 use mplusfonts::BitmapFont;
 use mplusfonts::style::BitmapFontStyle;
 use mplusfonts_macros::mplus;
+
+#[cfg(not(feature = "std"))]
+use micromath::F32Ext;
 
 pub mod frog;
 

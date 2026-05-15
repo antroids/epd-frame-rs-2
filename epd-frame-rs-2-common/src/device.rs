@@ -1,47 +1,13 @@
-use crate::display::color::{BinaryColorAdapter, E6Color};
-use crate::display::config_mode::draw_configuration_mode;
-use crate::display::epd_spectra_6::nibbles::Nibbles;
 use crate::display::epd_spectra_6::*;
-use crate::display::image::{E6Image, E6ImageSource};
-use crate::display::weather::Weather;
-use crate::display::{CroppedDrawTarget, DISPLAY_HEIGHT, DISPLAY_WIDTH, weather};
 use crate::errors::DeviceError;
-use crate::http::server::ServerAction;
-use crate::providers::open_meteo;
-use crate::scheduler::WeeklyScheduler;
-use crate::storage::{LastRunStatistics, LastRunStatus, PersistentState};
-use crate::time::NtpConfig;
-use crate::types::{Ipv4CidrAddress, LimitedString};
+use crate::storage::{LastRunStatistics, PersistentState};
 use crate::wifi::{
-    Auth, NetworkConfig, WifiAccessPointOptions, WifiJoinOptions, WifiNetworkScanRecord,
+    NetworkConfig, WifiAccessPointOptions, WifiJoinOptions, WifiNetworkScanRecord,
 };
-use crate::{display, http, time};
-use alloc::string::ToString;
 use alloc::vec::Vec;
-use alloc::{format, vec};
-use chrono::{FixedOffset, Timelike};
-use core::net::{IpAddr, SocketAddr};
 use core::time::Duration;
-use defmt::Format;
-use defmt_or_log::{derive_format_or_debug, error, info};
-use embassy_executor::Spawner;
-use embassy_net::dns::DnsQueryType;
-use embassy_net::udp::{PacketMetadata, UdpSocket};
+use defmt_or_log::derive_format_or_debug;
 use embassy_sync::channel::{Channel, Receiver, Sender};
-use embedded_graphics::mono_font::MonoTextStyle;
-use embedded_graphics::mono_font::ascii::FONT_6X10;
-use embedded_graphics::pixelcolor::{BinaryColor, Rgb888};
-use embedded_graphics::prelude::*;
-use embedded_graphics::primitives::{
-    CornerRadii, PrimitiveStyle, Rectangle, RoundedRectangle, StyledDrawable,
-};
-use embedded_graphics::text::Text;
-use mplusfonts::BitmapFont;
-use mplusfonts::style::{BitmapFontStyle, BitmapFontStyleBuilder};
-use mplusfonts_macros::mplus;
-use picoserve::make_static;
-use sntpc::{NtpContext, NtpTimestampGenerator, get_time};
-use sntpc_net_embassy::UdpSocketWrapper;
 
 pub use device_impl::Device;
 
@@ -49,8 +15,6 @@ mod device_impl;
 
 #[allow(dead_code)]
 const POOL_NTP_ADDR: &str = "pool.ntp.org:123";
-const BUFFER_SIZE: usize = 1024 * 8;
-const REQUEST_SIZE: usize = 1024 * 2;
 const ERROR_SLEEP_DURATION: Duration = Duration::from_mins(15);
 
 pub trait DeviceInterface {
@@ -115,7 +79,7 @@ const INDICATOR_STATE_CAPACITY: usize = 16;
 pub type DeviceIndicator = Channel<crate::RawMutex, IndicatorState, INDICATOR_STATE_CAPACITY>;
 pub type DeviceIndicatorSender = Sender<'static, crate::RawMutex, IndicatorState, INDICATOR_STATE_CAPACITY>;
 pub type DeviceIndicatorReceiver = Receiver<'static, crate::RawMutex, IndicatorState, INDICATOR_STATE_CAPACITY>;
-#[derive(Default, Copy, Clone, Debug)]
+#[derive(Default, Copy, Clone)]
 #[derive_format_or_debug]
 #[repr(u8)]
 pub enum IndicatorState {

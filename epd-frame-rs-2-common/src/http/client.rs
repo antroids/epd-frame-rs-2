@@ -9,19 +9,8 @@ const TCP_RX_BUFFER_SIZE: usize = 1024 * 4;
 
 type TcpClient<'a> =
     embassy_net::tcp::client::TcpClient<'a, TCP_POOL_SIZE, TCP_TX_BUFFER_SIZE, TCP_RX_BUFFER_SIZE>;
-type TcpConnection<'a> = embassy_net::tcp::client::TcpConnection<
-    'a,
-    TCP_POOL_SIZE,
-    TCP_TX_BUFFER_SIZE,
-    TCP_RX_BUFFER_SIZE,
->;
 type InnerHttpClient<'a> =
     reqwless::client::HttpClient<'a, TcpClient<'a>, embassy_net::dns::DnsSocket<'a>>;
-type InnerResponse<'resp, 'buf> = reqwless::response::Response<
-    'resp,
-    'buf,
-    reqwless::client::HttpConnection<'resp, TcpConnection<'resp>>,
->;
 
 pub struct HttpClient {
     tcp_client_state: embassy_net::tcp::client::TcpClientState<
@@ -34,7 +23,7 @@ pub struct HttpClient {
 }
 
 impl HttpClient {
-    pub fn new(stack: embassy_net::Stack<'static>, seed: u64) -> Self {
+    pub fn new(stack: embassy_net::Stack<'static>, _seed: u64) -> Self {
         let tcp_client_state = embassy_net::tcp::client::TcpClientState::new();
         let dns_client = embassy_net::dns::DnsSocket::new(stack.clone());
         Self {

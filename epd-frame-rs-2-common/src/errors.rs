@@ -1,7 +1,7 @@
+#[cfg(feature = "defmt")]
 use defmt::Format;
 use thiserror::Error;
 use crate::{display, http};
-use crate::display::epd_spectra_6::Error;
 use crate::types::LimitedString;
 
 #[derive(Debug, Error)]

@@ -1,9 +1,9 @@
 #![feature(type_alias_impl_trait)]
 
-use defmt_or_log::info;
 use crate::device::SimulatorDevice;
 use embassy_executor::Executor;
 use embassy_executor::Spawner;
+use log::info;
 use epd_frame_rs_2_common::device::Device;
 use static_cell::StaticCell;
 

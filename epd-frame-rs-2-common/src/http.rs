@@ -1,7 +1,7 @@
 use crate::types::LimitedString;
+#[cfg(feature = "defmt")]
 use defmt::Format;
 use defmt_or_log::derive_format_or_debug;
-use serde::de::Error;
 use thiserror::Error;
 
 pub mod client;
