@@ -71,26 +71,23 @@ fn scheduler_table_js(scheduler: &WeeklyScheduler) -> alloc::string::String {
             html += '</tr></thead><tbody>';
 
             for (let h = 0; h < 24; h++) {{
-                html += '<tr><td style="text-align:center;font-weight:600">'
-                      + String(h).padStart(2,'0') + ':00</td>';
-                for (let d = 0; d < 7; d++) {{
-                    const delay = DATA[d][h][1];
-                    html += '<td style="padding:2px">'
-                          + '<input type="number" min="0" max="59" style="width:3.5rem" title="Delay (min)" value="' + delay + '" '
-                          + 'id="sc_' + d + '_' + h + '" '
-                          + 'oninput="window.__schedulerData[' + d + '][' + h + '][1]=+this.value;syncScheduler()">'
-                          + '</td>';
+                    html += '<tr><td style="text-align:center;font-weight:600">'
+                          + String(h).padStart(2,'0') + ':00</td>';
+                    for (let d = 0; d < 7; d++) {{
+                        const delay = DATA[d][h][1];
+                        html += '<td style="padding:2px">'
+                              + '<input type="number" min="0" max="59" style="width:3.5rem" title="Delay (min)" value="' + delay + '" '
+                              + 'id="sc_' + d + '_' + h + '" '
+                              + 'oninput="window.__schedulerData[' + d + '][' + h + '][1]=+this.value;syncScheduler()">'
+                              + '</td>';
+                    }}
+                    html += '<td></td>';
+                    html += '</tr>';
                 }}
-                html += '<td style="padding:2px">'
-                      + '<button type="button" style="padding:1px 6px;font-size:.75rem;cursor:pointer" '
-                      + 'onclick="copyMonRow(' + h + ')">Copy Monday to all</button>'
-                      + '</td>';
-                html += '</tr>';
-            }}
 
-            html += '</tbody>';
-            table.innerHTML = html;
-        }})();"#,
+                html += '</tbody>';
+                table.innerHTML = html;
+            }})();"#,
         days_js = days_js,
         data = data,
     )
@@ -193,15 +190,25 @@ pub fn render_page(state: &PersistentState) -> maud::Markup {
                         window.__alpineState.state.scheduler = { daily: sched };
                     }
 
-                    function copyMonRow(h) {
+                    function fillRange() {
+                        const value = +document.getElementById('fill-value').value;
+                        const fromDay = +document.getElementById('fill-from-day').value;
+                        const toDay = +document.getElementById('fill-to-day').value;
+                        const fromHour = +document.getElementById('fill-from-hour').value;
+                        const toHour = +document.getElementById('fill-to-hour').value;
+
+                        if (isNaN(value) || value < 0 || value > 59) {
+                            alert('Please enter a valid delay value (0-59)');
+                            return;
+                        }
+
                         const data = window.__schedulerData;
-                        const monDelay = data[0][h][1];
-                        const monTasks = data[0][h][0];
-                        for (let d = 1; d < 7; d++) {
-                            data[d][h][0] = monTasks;
-                            data[d][h][1] = monDelay;
-                            const input = document.getElementById('sc_' + d + '_' + h);
-                            if (input) input.value = monDelay;
+                        for (let d = fromDay; d <= toDay; d++) {
+                            for (let h = fromHour; h <= toHour; h++) {
+                                data[d][h][1] = value;
+                                const input = document.getElementById('sc_' + d + '_' + h);
+                                if (input) input.value = value;
+                            }
                         }
                         syncScheduler();
                     }
@@ -354,6 +361,59 @@ pub fn render_page(state: &PersistentState) -> maud::Markup {
                         " (minutes from now, 0–59). "
                         "Columns = weekdays (Mon–Sun), rows = hours (00–23)."
                     }
+
+                    // Range fill controls
+                    (PreEscaped(r#"
+                    <fieldset style="margin-bottom:1rem;padding:.75rem">
+                        <legend style="font-size:.9rem">Fill Range</legend>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.5rem;align-items:end">
+                            <label style="margin:0">
+                                Value (0-59)
+                                <input type="number" id="fill-value" min="0" max="59" value="20" 
+                                       style="width:100%;padding:.3rem">
+                            </label>
+                            <label style="margin:0">
+                                From Day
+                                <select id="fill-from-day" style="width:100%;padding:.3rem">
+                                    <option value="0">Monday</option>
+                                    <option value="1">Tuesday</option>
+                                    <option value="2">Wednesday</option>
+                                    <option value="3">Thursday</option>
+                                    <option value="4">Friday</option>
+                                    <option value="5">Saturday</option>
+                                    <option value="6">Sunday</option>
+                                </select>
+                            </label>
+                            <label style="margin:0">
+                                To Day
+                                <select id="fill-to-day" style="width:100%;padding:.3rem">
+                                    <option value="0">Monday</option>
+                                    <option value="1">Tuesday</option>
+                                    <option value="2">Wednesday</option>
+                                    <option value="3">Thursday</option>
+                                    <option value="4" selected>Friday</option>
+                                    <option value="5">Saturday</option>
+                                    <option value="6">Sunday</option>
+                                </select>
+                            </label>
+                            <label style="margin:0">
+                                From Hour
+                                <input type="number" id="fill-from-hour" min="0" max="23" value="7" 
+                                       style="width:100%;padding:.3rem">
+                            </label>
+                            <label style="margin:0">
+                                To Hour
+                                <input type="number" id="fill-to-hour" min="0" max="23" value="9" 
+                                       style="width:100%;padding:.3rem">
+                            </label>
+                            <button type="button" onclick="fillRange()" 
+                                    style="padding:.4rem 1rem;background:#27ae60;color:#fff;border:none;border-radius:4px;cursor:pointer;white-space:nowrap">
+                                Apply
+                            </button>
+                        </div>
+                    </fieldset>
+                    "#))
+
                     (PreEscaped(r#"<div style="overflow-x:auto"><table id="sched-table"></table></div>"#))
                     // Populate the table after the DOM is ready.
                     script { (PreEscaped(sched_js)) }

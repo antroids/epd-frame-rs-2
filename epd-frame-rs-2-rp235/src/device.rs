@@ -286,6 +286,8 @@ fn low_power_mode() {
     pac::CLOCKS.clk_usb_ctrl().modify(|r| r.set_enabled(false));
     pac::CLOCKS.clk_peri_ctrl().modify(|r| r.set_enabled(false));
 
+    disable_usb();
+
     pac::POWMAN.state().modify(|r| {
         r.set_req(0b00001111);
         r.0 = POWMAN_PASSWORD | (r.0 & 0xFFFF);
@@ -294,6 +296,22 @@ fn low_power_mode() {
     unsafe {
         asm!("wfi");
     }
+}
+
+fn disable_usb() {
+    pac::USB.usbphy_direct_override().modify(|r| {
+        r.set_rx_pd_override_en(true);
+        r.set_tx_pd_override_en(true);
+        r.set_dm_pulldn_en_override_en(true);
+        r.set_dp_pulldn_en_override_en(true);
+    });
+
+    pac::USB.usbphy_direct().modify(|r| {
+        r.set_tx_pd(true);
+        r.set_rx_pd(true);
+        r.set_dm_pulldn_en(true);
+        r.set_dp_pulldn_en(true);
+    });
 }
 
 unsafe extern "C" {

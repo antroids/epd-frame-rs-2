@@ -1,9 +1,10 @@
 use aligned::{A4, Aligned};
 use alloc::sync::Arc;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::mem;
-use core::net::{Ipv4Addr, SocketAddr};
+use core::net::{IpAddr, Ipv4Addr, SocketAddr};
 use cyw43_pio::{DEFAULT_CLOCK_DIVIDER, PioSpi};
 use defmt::{Format, error};
 use edge_nal::UdpBind;
@@ -24,11 +25,19 @@ use static_cell::StaticCell;
 
 const NET_STACK_RESOURCES_SIZE: usize = 8;
 const DHCP_UDP_STACK_RESOURCES_SIZE: usize = 1024;
+const CAPTIVE_PORTAL_UDP_STACK_RESOURCES_SIZE: usize = 1024;
 
 type DhcpUdpBuffers = edge_nal_embassy::UdpBuffers<
     2,
     DHCP_UDP_STACK_RESOURCES_SIZE,
     DHCP_UDP_STACK_RESOURCES_SIZE,
+    2,
+>;
+
+type CaptivePortalUdpBuffers = edge_nal_embassy::UdpBuffers<
+    2,
+    CAPTIVE_PORTAL_UDP_STACK_RESOURCES_SIZE,
+    CAPTIVE_PORTAL_UDP_STACK_RESOURCES_SIZE,
     2,
 >;
 
@@ -346,6 +355,7 @@ async fn start_dhcp_server(
     spawner: &Spawner,
 ) -> Result<(), DeviceError> {
     spawner.spawn(dhcp_server_task(stack, address.into())?);
+    spawner.spawn(captive_portal_task(stack, address.into())?);
     Ok(())
 }
 
@@ -376,4 +386,27 @@ async fn dhcp_server_task(stack: embassy_net::Stack<'static>, address: Ipv4Addr)
     if let Err(e) = edge_dhcp::io::server::run(&mut server, &options, &mut socket, &mut buf).await {
         error!("DHCP server run error: {:?}", e);
     }
+}
+
+#[embassy_executor::task]
+pub async fn captive_portal_task(wifi_stack: embassy_net::Stack<'static>, address: Ipv4Addr) {
+    static UDP_BUFFERS: StaticCell<CaptivePortalUdpBuffers> = StaticCell::new();
+    let udp_stack = edge_nal_embassy::Udp::new(
+        wifi_stack,
+        UDP_BUFFERS.init(edge_nal_embassy::UdpBuffers::new()),
+    );
+    let mut tx_buf = vec![0; CAPTIVE_PORTAL_UDP_STACK_RESOURCES_SIZE];
+    let mut rx_buf = vec![0; CAPTIVE_PORTAL_UDP_STACK_RESOURCES_SIZE];
+
+    let result = edge_captive::io::run(
+        &udp_stack,
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 80),
+        &mut tx_buf,
+        &mut rx_buf,
+        address,
+        core::time::Duration::from_secs(60),
+    )
+    .await;
+
+    error!("Captive portal task error: {:?}", result);
 }

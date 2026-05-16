@@ -36,6 +36,7 @@ zerocopy = { workspace = true }
 
 edge-nal = { version = "0.6.0" }
 edge-dhcp = { version = "0.7.0", features = ["embassy-futures", "embassy-time", "defmt", "io", "edge-nal"], default-features = false }
+edge-captive = { version = "0.7.0", features = ["defmt", "edge-nal", "io"], default-features = false }
 edge-nal-embassy = { version = "0.8.1", features = ["defmt"] }
 log = "0.4.29"
 
