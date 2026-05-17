@@ -1,22 +1,17 @@
 use alloc::borrow::Cow;
-use crate::display::DEFAULT_FONT_12;
 use crate::display::color::{BinaryColorAdapter, E6Color};
 use crate::display::image::E6ImageSource;
 use embedded_graphics::Drawable;
 use embedded_graphics::draw_target::DrawTarget;
-use embedded_graphics::geometry::{Dimensions, Point, Size};
+use embedded_graphics::geometry::{Dimensions, Point};
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::primitives::{
     CornerRadii, PrimitiveStyle, Rectangle, RoundedRectangle, StyledDrawable,
 };
 use embedded_graphics::text::renderer::{CharacterStyle, TextRenderer};
 use embedded_layout::View;
-use embedded_layout::layout::linear::LinearLayout;
-use embedded_layout::prelude::{Chain, horizontal};
-use mplusfonts::style::BitmapFontStyle;
 
 pub(crate) mod weather;
-
 pub(crate) trait Widget: Drawable<Color = E6Color> + View {}
 
 #[derive(Clone)]

@@ -7,10 +7,10 @@ edition = "2024"
 default = ["defmt"]
 defmt = ["defmt-or-log/defmt", "embassy-net/defmt", "sntpc/defmt", "sntpc-net-embassy/defmt",
     "chrono/defmt", "embedded-graphics/defmt", "embedded-hal/defmt-03", "embedded-hal-async/defmt-03",
-    "mplusfonts/defmt", "picoserve/defmt", "embassy-sync/defmt", "embassy-futures/defmt"]
+    "mplusfonts/defmt", "picoserve/defmt", "embassy-sync/defmt", "embassy-futures/defmt", "embedded-tls/defmt"]
 log = ["defmt-or-log/log", "sntpc/log", "sntpc-net-embassy/log", "dep:log", "reqwless/log", "picoserve/log",
-    "embassy-sync/log", "embassy-futures/log"]
-std = ["picoserve/std", "embassy-sync/std"]
+    "embassy-sync/log", "embassy-futures/log", "embedded-tls/log"]
+std = ["picoserve/std", "embassy-sync/std", "embedded-tls/std"]
 
 [dependencies]
 defmt = { workspace = true }
@@ -24,11 +24,6 @@ embassy-executor = { workspace = true }
 embassy-time = { workspace = true }
 embassy-sync = { version = "0.8.0" }
 embassy-futures = { workspace = true }
-
-# Fix for embedded-tls shit
-#der = { version = "0.8.0-rc.2", features = ["derive", "oid", "time", "heapless"] }
-#rsa = { version = "0.9.9", features = ["sha2"], default-features = false }
-#embedded-tls = { version = "0.18.0", features = ["rustpki", "log"], default-features = false }
 
 sntpc = { version = "0.8.0", default-features = false }
 sntpc-net-embassy = { version = "0.8.0", features = ["ipv6"], default-features = false }
@@ -47,6 +42,9 @@ micromath = { version = "2.1.0", default-features = false }
 fastrand = { version = "2.4.1", features = ["alloc"], default-features = false }
 qrcodegen-no-heap = { version = "1.8.1" }
 
-reqwless = { workspace = true }
+reqwless = { workspace = true, features = ["embedded-tls"] }
 picoserve = { version = "0.18.0", features = ["embassy", "alloc"], default-features = false }
 maud = { version = "0.27.0" }
+
+der = { version = "0.8.0-rc.2", features = ["derive", "oid", "time", "heapless"]}
+embedded-tls = { version = "0.18.0", features = ["alloc"], default-features = false }

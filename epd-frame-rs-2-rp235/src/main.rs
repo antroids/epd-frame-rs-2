@@ -17,7 +17,7 @@ use panic_probe as _;
 
 #[global_allocator]
 static HEAP: LlffHeap = LlffHeap::empty();
-const HEAP_SIZE: usize = 1024 * 224;
+const HEAP_SIZE: usize = 1024 * 208;
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) -> ! {

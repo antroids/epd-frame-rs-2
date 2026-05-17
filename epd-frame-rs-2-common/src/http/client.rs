@@ -1,11 +1,14 @@
 use crate::types::LimitedString;
 use alloc::{format, vec};
+use reqwless::client::{TlsConfig, TlsVerify};
 use reqwless::headers::ContentType;
 use reqwless::request::{Method, RequestBuilder};
 
 const TCP_POOL_SIZE: usize = 1;
-const TCP_TX_BUFFER_SIZE: usize = 1024;
-const TCP_RX_BUFFER_SIZE: usize = 1024 * 4;
+const TCP_TX_BUFFER_SIZE: usize = 1024 * 8;
+const TCP_RX_BUFFER_SIZE: usize = 1024 * 8;
+const TLS_TX_BUFFER_SIZE: usize = 1024 * 32;
+const TLS_RX_BUFFER_SIZE: usize = 1024 * 32;
 
 type TcpClient<'a> =
     embassy_net::tcp::client::TcpClient<'a, TCP_POOL_SIZE, TCP_TX_BUFFER_SIZE, TCP_RX_BUFFER_SIZE>;
@@ -20,16 +23,18 @@ pub struct HttpClient {
     >,
     dns_client: embassy_net::dns::DnsSocket<'static>,
     stack: embassy_net::Stack<'static>,
+    rand: fastrand::Rng,
 }
 
 impl HttpClient {
-    pub fn new(stack: embassy_net::Stack<'static>, _seed: u64) -> Self {
+    pub fn new(stack: embassy_net::Stack<'static>, seed: u64) -> Self {
         let tcp_client_state = embassy_net::tcp::client::TcpClientState::new();
         let dns_client = embassy_net::dns::DnsSocket::new(stack.clone());
         Self {
             tcp_client_state,
             dns_client,
             stack,
+            rand: fastrand::Rng::with_seed(seed),
         }
     }
 
@@ -44,8 +49,16 @@ impl HttpClient {
     {
         let response_buffer_len = response_buffer.len();
         let tcp_client = TcpClient::new(self.stack, &mut self.tcp_client_state);
+        let mut tls_rx_buf = vec![0u8; TLS_RX_BUFFER_SIZE];
+        let mut tls_tx_buf = vec![0u8; TLS_TX_BUFFER_SIZE];
+        let tls_config = TlsConfig::new(
+            self.rand.get_seed(),
+            &mut tls_rx_buf,
+            &mut tls_tx_buf,
+            TlsVerify::None,
+        );
         let mut http_client =
-            InnerHttpClient::new(&tcp_client, &self.dns_client);
+            InnerHttpClient::new_with_tls(&tcp_client, &self.dns_client, tls_config);
         let mut request_handle = http_client
             .request(Method::GET, url)
             .await?

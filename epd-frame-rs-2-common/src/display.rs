@@ -33,7 +33,8 @@ pub mod weather;
 pub const DISPLAY_WIDTH: u16 = 800;
 pub const DISPLAY_HEIGHT: u16 = 480;
 
-pub static DEFAULT_FONT_12: BitmapFont<BinaryColor, 2> = mplus!(
+pub type BinaryFontStyleType = BitmapFontStyle<'static, 'static, BinaryColor, BinaryColor, 2>;
+pub const DEFAULT_FONT_12: BitmapFont<BinaryColor, 2> = mplus!(
     2,
     BOLD,
     cap_height(12),
@@ -45,6 +46,24 @@ pub static DEFAULT_FONT_12: BitmapFont<BinaryColor, 2> = mplus!(
     'a'..='z',
     [" :,.()/%"]
 );
+pub const DEFAULT_FONT_12_STYLE: BinaryFontStyleType =
+    BitmapFontStyle::new(&DEFAULT_FONT_12, BinaryColor::On);
+
+pub const DEFAULT_FONT_10: BitmapFont<BinaryColor, 2> = mplus!(
+    1,
+    BOLD,
+    cap_height(10),
+    true,
+    2,
+    1,
+    '0'..='9',
+    'A'..='Z',
+    'a'..='z',
+    [" :,.()/%+-°"]
+);
+
+pub const DEFAULT_FONT_10_STYLE: BinaryFontStyleType =
+    BitmapFontStyle::new(&DEFAULT_FONT_10, BinaryColor::On);
 
 pub struct CroppedDrawTarget<'a, D: DrawTarget>(pub &'a mut D, pub Rectangle);
 
@@ -122,14 +141,13 @@ pub async fn draw_last_run_statistics(
     last_run_statistics: &LastRunStatistics,
 ) -> Result<(), DeviceError> {
     if let LastRunStatus::Failed = last_run_statistics.status {
-        let style = BitmapFontStyle::new(&DEFAULT_FONT_12, BinaryColor::On);
         let text = format!(
             "Last run failed with: {:?}",
             last_run_statistics.failed_cause
         );
         BinaryColorAdapter::draw_transparent(
             E6Color::Red,
-            &Text::new(text.as_str(), Point::new(5, 460), style),
+            &Text::new(text.as_str(), Point::new(5, 460), DEFAULT_FONT_12_STYLE),
             draw_target,
         )?;
     }

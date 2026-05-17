@@ -180,7 +180,7 @@ impl DeviceInterface for SimulatorDevice {
     }
 
     async fn write_last_run_statistics(&mut self, last_run_statistics: &LastRunStatistics) {
-        std::fs::File::open(LAST_RUN_STATISTICS_FILE)
+        std::fs::File::create(LAST_RUN_STATISTICS_FILE)
             .unwrap()
             .write_all(serde_json::to_vec(last_run_statistics).unwrap().as_slice())
             .unwrap();

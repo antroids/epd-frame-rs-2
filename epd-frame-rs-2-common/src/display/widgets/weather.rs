@@ -6,6 +6,7 @@ use crate::display::widgets::weather::styles::{
     TEMPERATURE_FONT_12, TEMPERATURE_FONT_20, TEMPERATURE_FONT_50,
 };
 use crate::display::widgets::{Icon, RoundWidgetBorder, Text, Widget};
+use crate::display::{BinaryFontStyleType, DEFAULT_FONT_10_STYLE};
 use alloc::format;
 use alloc::string::ToString;
 use core::f32::consts::PI;
@@ -24,10 +25,9 @@ use embedded_layout::{View, ViewGroup};
 use micromath::F32Ext;
 use mplusfonts::style::BitmapFontStyle;
 
-type BinaryFontStyleType = BitmapFontStyle<'static, 'static, BinaryColor, BinaryColor, 2>;
-
 pub(super) mod styles {
     use crate::display;
+    use crate::display::BinaryFontStyleType;
     use crate::display::color::E6Color;
     use crate::display::weather::TemperatureCelsium;
     use embedded_graphics::pixelcolor::BinaryColor;
@@ -41,22 +41,12 @@ pub(super) mod styles {
         mplus!(1, BOLD, cap_height(20), true, 2, 1, '0'..='9', ["+-C°"]);
     pub const TEMPERATURE_FONT_12: BitmapFont<BinaryColor, 2> =
         mplus!(1, BOLD, cap_height(12), true, 2, 1, '0'..='9', ["+-C°"]);
-    pub const VALUE_FONT_10: BitmapFont<BinaryColor, 2> = mplus!(
-        1,
-        BOLD,
-        cap_height(10),
-        true,
-        2,
-        1,
-        '0'..='9',
-        ["., +-C°km/h%"]
-    );
 
-    pub fn date_time_style() -> super::BinaryFontStyleType {
+    pub fn date_time_style() -> BinaryFontStyleType {
         BitmapFontStyle::new(&display::DEFAULT_FONT_12, BinaryColor::On)
     }
 
-    pub fn current_weather_details_style() -> super::BinaryFontStyleType {
+    pub fn current_weather_details_style() -> BinaryFontStyleType {
         date_time_style()
     }
 
@@ -133,7 +123,7 @@ impl Drawable for WindArrow {
         let p_w1 = Point::new(w1_x.round() as i32, w1_y.round() as i32);
         let p_w2 = Point::new(w2_x.round() as i32, w2_y.round() as i32);
 
-        let style = PrimitiveStyle::with_stroke(E6Color::Black, 3);
+        let style = PrimitiveStyle::with_stroke(E6Color::Black, self.stroke_width);
 
         Line::new(p_base, p_tip).into_styled(style).draw(target)?;
         Line::new(p_tip, p_w1).into_styled(style).draw(target)?;
@@ -212,8 +202,7 @@ pub struct IconValue16<'a> {
 impl<'a> IconValue16<'a> {
     pub fn new(icon: &'a Icon16, text: &'a str, color: E6Color) -> Self {
         let icon = Icon::new(icon);
-        let style = BitmapFontStyle::new(&styles::VALUE_FONT_10, BinaryColor::On);
-        let text = Text::new(text, style, color).translate((18, 14).into());
+        let text = Text::new(text, DEFAULT_FONT_10_STYLE, color).translate((18, 14).into());
         Self { icon, text }
     }
 }
@@ -264,8 +253,9 @@ impl<'a> HourlyWeatherWidget<'a> {
         let mut apparent_temperature = IconValue16::new(
             &Icon16::Temperature,
             format!(
-                "{:.1}mm {:}%",
-                hourly_weather.precipitation, hourly_weather.precipitation_probability
+                "{:+}/{:+}C°",
+                hourly_weather.apparent_temperature.round() as u32,
+                hourly_weather.apparent_temperature.round() as u32
             )
             .leak(),
             E6Color::Black,

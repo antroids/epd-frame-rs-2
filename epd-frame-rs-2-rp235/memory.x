@@ -17,8 +17,8 @@ __cyw43_clm_length = 4752;
 __config_section_length = 256K;
 
 MEMORY {
-    FLASH : ORIGIN = 0x10000000, LENGTH = __firmware_section_length
-    FLASH2 : ORIGIN = ORIGIN(FLASH) + LENGTH(FLASH), LENGTH = __firmware_section_length
+    FLASH : ORIGIN = 0x10000000, LENGTH = __firmware_section_length + __firmware_section_length
+    FLASH2 : ORIGIN = ORIGIN(FLASH) + LENGTH(FLASH), LENGTH = 0
     CYW43FW : ORIGIN = ORIGIN(FLASH2) + LENGTH(FLASH2), LENGTH = __cyw43_firmware_section_length
     CYW43CLM : ORIGIN = ORIGIN(CYW43FW) + LENGTH(CYW43FW), LENGTH = __cyw43_clm_section_length
     CONFIG : ORIGIN = ORIGIN(CYW43CLM) + LENGTH(CYW43CLM), LENGTH = __config_section_length
