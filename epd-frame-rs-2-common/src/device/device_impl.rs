@@ -1,8 +1,9 @@
 use crate::device::{DeviceInterface, ERROR_SLEEP_DURATION, IndicatorState, Input};
 use crate::display::color::E6Color;
 use crate::display::config_mode::draw_configuration_mode;
-use crate::display::epd_spectra_6::{FrameBuffer, DisplayDriver};
-use crate::display::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
+use crate::display::epd_spectra_6::{DisplayDriver, FrameBuffer};
+use crate::display::widgets::weather::IconValue16;
+use crate::display::{DISPLAY_HEIGHT, DISPLAY_WIDTH, widgets};
 use crate::errors::DeviceError;
 use crate::http::server::ServerAction;
 use crate::providers::open_meteo;
@@ -11,7 +12,9 @@ use crate::{display, http};
 use core::time::Duration;
 use defmt_or_log::{error, info};
 use embassy_executor::Spawner;
+use embedded_graphics::Drawable;
 use embedded_graphics::geometry::Size;
+use embedded_layout::View;
 use picoserve::make_static;
 
 #[allow(async_fn_in_trait)]
@@ -103,7 +106,6 @@ pub trait Device: DeviceInterface {
         let current_time = Some(weather.current.time);
 
         display::draw_weather(&mut frame_buffer, &weather, &mut rand).await?;
-        display::draw_last_run_statistics(&mut frame_buffer, last_run_statistics).await?;
 
         let _ = indicator.try_send(IndicatorState::UpdatingScreen);
         display.refresh(frame_buffer.as_bytes()).await?;
@@ -163,7 +165,8 @@ pub trait Device: DeviceInterface {
             .await?;
 
         let _ = indicator.try_send(IndicatorState::ConfigurationMode);
-        let action_channel = make_static!(http::server::ActionChannel, crate::device::Channel::new());
+        let action_channel =
+            make_static!(http::server::ActionChannel, crate::device::Channel::new());
         let seed = self.rand().await;
         let network_stack = self.network_stack().await?.clone();
         info!("Starting HTTP server");

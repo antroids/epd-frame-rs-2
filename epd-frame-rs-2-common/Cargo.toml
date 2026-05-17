@@ -39,6 +39,7 @@ serde_json = { workspace = true }
 embedded-graphics = { workspace = true }
 embedded-hal = { workspace = true }
 embedded-hal-async = { workspace = true }
+embedded-layout = { git = "https://github.com/bugadani/embedded-layout" }
 
 mplusfonts = { version = "0.3.4", default-features = false }
 mplusfonts-macros = { version = "0.3.4", default-features = false }

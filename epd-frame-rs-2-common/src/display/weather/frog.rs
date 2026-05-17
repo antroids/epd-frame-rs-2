@@ -1,6 +1,7 @@
 use crate::display::image::E6ImageSource;
 use crate::display::weather::Icon64;
 use defmt_or_log::derive_format_or_debug;
+use embedded_graphics::geometry::Size;
 
 const CLEAR_NIGHT: &[u8] =
     include_bytes!("../../../resources/frog_130_180/ClearNight.e6spectra");
@@ -98,6 +99,10 @@ impl E6ImageSource for Frog130x180 {
             Frog130x180::ThunderShowersNight => THUNDER_SHOWERS_NIGHT,
             Frog130x180::Wind => WIND,
         }
+    }
+
+    fn size(&self) -> Size {
+        (130, 180).into()
     }
 }
 

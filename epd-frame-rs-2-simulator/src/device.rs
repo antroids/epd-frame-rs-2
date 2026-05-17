@@ -103,7 +103,7 @@ impl DeviceInterface for SimulatorDevice {
         });
         //let config = Config::dhcpv4(Default::default());
 
-        static RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
+        static RESOURCES: StaticCell<StackResources<128>> = StaticCell::new();
         let (stack, runner) = embassy_net::new(
             device,
             config,

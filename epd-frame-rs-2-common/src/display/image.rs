@@ -1,7 +1,7 @@
 use crate::display::color::E6Color;
 use defmt_or_log::warn;
 use embedded_graphics::Pixel;
-use embedded_graphics::prelude::{DrawTarget, Point};
+use embedded_graphics::prelude::{DrawTarget, Point, Size};
 use zerocopy::{FromBytes, Immutable, KnownLayout};
 
 #[derive(FromBytes, KnownLayout, Immutable)]
@@ -113,6 +113,8 @@ fn read_nibble(data: &[u8], index: usize) -> u8 {
 
 pub trait E6ImageSource {
     fn source_bytes(&self) -> &[u8];
+
+    fn size(&self) -> Size;
 
     fn draw<E>(
         &self,
