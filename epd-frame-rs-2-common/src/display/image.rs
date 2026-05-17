@@ -67,8 +67,7 @@ impl<'a> Iterator for E6ImageIterator<'a> {
                 let pixel = Pixel(
                     Point::new(
                         self.pixel_index as i32 % self.image.width as i32,
-                        self.pixel_index as i32 / self.image.width as i32
-                            - self.image.height as i32,
+                        self.pixel_index as i32 / self.image.width as i32,
                     ),
                     color,
                 );

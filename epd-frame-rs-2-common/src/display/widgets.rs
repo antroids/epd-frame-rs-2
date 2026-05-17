@@ -25,9 +25,10 @@ pub struct Text<'a, S: Clone> {
     color: E6Color,
 }
 
-impl<'a, S: Clone> Text<'a, S> {
+impl<'a, S: TextRenderer + Clone> Text<'a, S> {
     pub fn new(text: &'a str, style: S, color: E6Color) -> Self {
-        let inner = embedded_graphics::text::Text::new(text, Default::default(), style);
+        let mut inner = embedded_graphics::text::Text::new(text, Default::default(), style);
+
         Self { inner, color }
     }
 

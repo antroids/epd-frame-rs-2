@@ -1,6 +1,7 @@
 use crate::display::color::{BinaryColorAdapter, E6Color};
 use crate::display::epd_spectra_6::FrameBuffer;
 use crate::display::weather::Weather;
+use crate::display::weather::frog::Frog130x180;
 use crate::display::widgets::weather::{
     CurrentWeatherWidget, DailyWeatherWidget, HourlyWeatherWidget,
 };
@@ -12,12 +13,11 @@ use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::{Point, Size};
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::Dimensions;
-use embedded_graphics::primitives::{
-    CornerRadii, PrimitiveStyle, Rectangle, RoundedRectangle, StyledDrawable,
-};
+use embedded_graphics::primitives::{Rectangle, StyledDrawable};
 use embedded_graphics::text::Text;
 use embedded_graphics::{Drawable, Pixel};
 use embedded_layout::View;
+use embedded_layout::prelude::{Align, horizontal, vertical};
 use mplusfonts::BitmapFont;
 use mplusfonts::style::BitmapFontStyle;
 use mplusfonts_macros::mplus;
@@ -93,6 +93,27 @@ pub async fn draw_weather(
             .translate_mut(point)
             .draw(frame_buffer)?;
     }
+    Ok(())
+}
+
+pub async fn draw_weather_error(
+    frame_buffer: &mut FrameBuffer<Vec<u8>>,
+    error: &DeviceError,
+) -> Result<(), DeviceError> {
+    let text = format!("Weather Error: {}", error);
+    let boundaries = Rectangle::new(Point::new(0, 0), Size::new(800, 400));
+
+    widgets::Icon::new(&Frog130x180::Thunder)
+        .align_to(&boundaries, horizontal::Center, vertical::Top)
+        .draw(frame_buffer)?;
+    widgets::Text::new(
+        text.as_str(),
+        BitmapFontStyle::new(&DEFAULT_FONT_12, BinaryColor::On),
+        E6Color::Black,
+    )
+    .align_to(&boundaries, horizontal::Center, vertical::Center)
+    .draw(frame_buffer)?;
+
     Ok(())
 }
 

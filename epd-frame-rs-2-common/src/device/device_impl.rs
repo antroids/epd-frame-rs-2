@@ -16,6 +16,7 @@ use embedded_graphics::Drawable;
 use embedded_graphics::geometry::Size;
 use embedded_layout::View;
 use picoserve::make_static;
+use crate::display::weather::Weather;
 
 #[allow(async_fn_in_trait)]
 pub trait Device: DeviceInterface {
@@ -90,7 +91,7 @@ pub trait Device: DeviceInterface {
             persistent_state.weather_options.latitude,
             persistent_state.weather_options.longitude,
         )
-        .await?;
+        .await;
 
         self.leave_wifi().await?;
         self.power_off_radio_module().await?;
@@ -103,9 +104,15 @@ pub trait Device: DeviceInterface {
             Size::new(DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32),
             E6Color::White,
         );
-        let current_time = Some(weather.current.time);
 
-        display::draw_weather(&mut frame_buffer, &weather, &mut rand).await?;
+        match &weather {
+            Ok(weather) => {
+                display::draw_weather(&mut frame_buffer, weather, &mut rand).await?;
+            }
+            Err(weather_error) => {
+                display::draw_weather_error(&mut frame_buffer, weather_error).await?;
+            }
+        }
 
         let _ = indicator.try_send(IndicatorState::UpdatingScreen);
         display.refresh(frame_buffer.as_bytes()).await?;
@@ -115,6 +122,7 @@ pub trait Device: DeviceInterface {
         while let Ok(input_event) = input.try_receive() {
             self.process_input(&input_event, persistent_state).await?;
         }
+        let current_time = weather.as_ref().map(|w| w.current.time).ok();
         let task_scheduler = current_time
             .map(|t| persistent_state.scheduler.task_scheduler(t))
             .unwrap_or_default();
@@ -129,7 +137,7 @@ pub trait Device: DeviceInterface {
         self.power_off_for(Duration::from_mins(task_scheduler.minutes_delay as u64))
             .await?;
 
-        Ok(())
+        weather.map(|_| ())
     }
 
     async fn config_mode_loop(

@@ -213,7 +213,7 @@ impl<'a> IconValue16<'a> {
     pub fn new(icon: &'a Icon16, text: &'a str, color: E6Color) -> Self {
         let icon = Icon::new(icon);
         let style = BitmapFontStyle::new(&styles::VALUE_FONT_10, BinaryColor::On);
-        let text = Text::new(text, style, color).translate((18, -2).into());
+        let text = Text::new(text, style, color).translate((18, 14).into());
         Self { icon, text }
     }
 }
@@ -291,14 +291,14 @@ impl<'a> HourlyWeatherWidget<'a> {
             vertical::NoAlignment,
         );
         weather_icon_background.translate_mut((4, 76).into());
-        weather_icon.translate_mut((23, 80).into());
+        weather_icon.translate_mut((23, 16).into());
         wind_arrow.translate_mut((90, 30).into());
         temperature_small
             .translate_mut((15, 110).into())
             .align_to_mut(&frame, horizontal::Center, vertical::NoAlignment);
-        apparent_temperature.translate_mut((4, 142).into());
-        wind_speed.translate_mut((4, 158).into());
-        precipitation_probability.translate_mut((4, 176).into());
+        apparent_temperature.translate_mut((4, 126).into());
+        wind_speed.translate_mut((4, 142).into());
+        precipitation_probability.translate_mut((4, 160).into());
 
         Self {
             frame,
@@ -399,7 +399,7 @@ impl<'a> DailyWeatherWidget<'a> {
             vertical::NoAlignment,
         );
         weather_icon_background.translate_mut((4, 76).into());
-        weather_icon.translate_mut((23, 80).into());
+        weather_icon.translate_mut((23, 16).into());
         wind_arrow.translate_mut((90, 30).into());
         temperature_small
             .translate_mut((15, 110).into())
@@ -407,9 +407,9 @@ impl<'a> DailyWeatherWidget<'a> {
         temperature_small_secondary
             .translate_mut((35, 132).into())
             .align_to_mut(&frame, horizontal::Center, vertical::NoAlignment);
-        apparent_temperature.translate_mut((4, 160).into());
-        wind_speed.translate_mut((4, 178).into());
-        precipitation_probability.translate_mut((4, 196).into());
+        apparent_temperature.translate_mut((4, 144).into());
+        wind_speed.translate_mut((4, 162).into());
+        precipitation_probability.translate_mut((4, 180).into());
 
         Self {
             frame,
@@ -500,7 +500,7 @@ impl<'a> CurrentWeatherWidget<'a> {
             E6Color::Black,
         );
 
-        frog_icon.translate_mut((210, 180).into());
+        frog_icon.translate_mut((210, 0).into());
         date_time.translate_mut((5, 17).into());
         temperature.translate_mut((5, 75).into());
         apparent_temperature_label.translate_mut((5, 105).into());
