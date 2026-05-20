@@ -1,14 +1,7 @@
 use crate::display::image::E6ImageSource;
-use alloc::string::ToString;
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use defmt_or_log::derive_format_or_debug;
-use embedded_graphics::draw_target::DrawTarget;
-use embedded_graphics::prelude::{Primitive, Size};
-use embedded_graphics::primitives::StyledDrawable;
-use embedded_graphics::Drawable;
-
-#[cfg(not(feature = "std"))]
-use micromath::F32Ext;
+use embedded_graphics::prelude::Size;
 
 pub mod frog;
 
@@ -44,11 +37,6 @@ const THUNDER_SHOWERS_DAY: &[u8] =
 const THUNDER_SHOWERS_NIGHT: &[u8] =
     include_bytes!("../../resources/weather_icons_64/thunder-showers-night.e6spectra");
 const WIND: &[u8] = include_bytes!("../../resources/weather_icons_64/wind.e6spectra");
-
-const HUMIDITY_16: &[u8] = include_bytes!("../../resources/icons_16/humidity_16.e6spectra");
-const WATER_16: &[u8] = include_bytes!("../../resources/icons_16/water_16.e6spectra");
-const TEMPERATURE_16: &[u8] = include_bytes!("../../resources/icons_16/temperature_16.e6spectra");
-const WIND_16: &[u8] = include_bytes!("../../resources/icons_16/wind_16.e6spectra");
 
 #[derive(Clone, Copy)]
 #[derive_format_or_debug]
@@ -111,36 +99,12 @@ impl E6ImageSource for Icon64 {
     }
 }
 
-#[derive(Clone, Copy)]
-#[derive_format_or_debug]
-#[repr(u8)]
-pub enum Icon16 {
-    Temperature,
-    Humidity,
-    Water,
-    Wind,
-}
-
-impl E6ImageSource for Icon16 {
-    fn source_bytes(&self) -> &[u8] {
-        match self {
-            Icon16::Temperature => TEMPERATURE_16,
-            Icon16::Humidity => HUMIDITY_16,
-            Icon16::Water => WATER_16,
-            Icon16::Wind => WIND_16,
-        }
-    }
-
-    fn size(&self) -> Size {
-        (16, 16).into()
-    }
-}
-
 pub type TemperatureCelsium = f32;
 pub type Percentage = u16;
 pub type SpeedKilometersPerHour = u16;
 pub type DirectionDegrees = u16;
 pub type LevelMillimeters = f32;
+pub type UvIndex = f32;
 
 #[derive(Clone, Copy)]
 #[derive_format_or_debug]
@@ -164,6 +128,7 @@ pub struct CurrentWeather {
     pub wind_gusts: SpeedKilometersPerHour,
     pub weather_icon: Icon64,
     pub cloud_cover: Percentage,
+    pub uv_index: UvIndex,
 }
 
 #[derive(Clone, Copy)]
@@ -173,12 +138,14 @@ pub struct HourlyWeather {
     pub temperature: TemperatureCelsium,
     pub apparent_temperature: TemperatureCelsium,
     pub is_day: bool,
+    pub humidity: Percentage,
     pub precipitation: LevelMillimeters,
     pub precipitation_probability: Percentage,
     pub wind_speed: SpeedKilometersPerHour,
     pub wind_direction: DirectionDegrees,
     pub wind_gusts: SpeedKilometersPerHour,
     pub weather_icon: Icon64,
+    pub uv_index: UvIndex,
 }
 
 #[derive(Clone, Copy)]
@@ -187,6 +154,7 @@ pub struct DailyWeather {
     pub time: NaiveDate,
     pub temperature_min: TemperatureCelsium,
     pub temperature_max: TemperatureCelsium,
+    pub humidity: Percentage,
     pub apparent_temperature_min: TemperatureCelsium,
     pub apparent_temperature_max: TemperatureCelsium,
     pub precipitation: LevelMillimeters,
@@ -195,4 +163,5 @@ pub struct DailyWeather {
     pub wind_direction: DirectionDegrees,
     pub wind_gusts: SpeedKilometersPerHour,
     pub weather_icon: Icon64,
+    pub uv_index_max: UvIndex,
 }

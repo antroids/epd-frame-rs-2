@@ -2,21 +2,16 @@ use crate::device::{DeviceInterface, ERROR_SLEEP_DURATION, IndicatorState, Input
 use crate::display::color::E6Color;
 use crate::display::config_mode::draw_configuration_mode;
 use crate::display::epd_spectra_6::{DisplayDriver, FrameBuffer};
-use crate::display::weather::Weather;
-use crate::display::widgets::weather::IconValue16;
-use crate::display::{DISPLAY_HEIGHT, DISPLAY_WIDTH, widgets};
+use crate::display::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use crate::errors::DeviceError;
 use crate::http::server::ServerAction;
 use crate::providers::open_meteo;
 use crate::storage::{LastRunStatistics, PersistentState};
 use crate::{display, http};
-use alloc::vec::Vec;
 use core::time::Duration;
 use defmt_or_log::{error, info};
 use embassy_executor::Spawner;
-use embedded_graphics::Drawable;
 use embedded_graphics::geometry::Size;
-use embedded_layout::View;
 use picoserve::make_static;
 
 #[allow(async_fn_in_trait)]
@@ -114,6 +109,18 @@ pub trait Device: DeviceInterface {
                 display::draw_weather_error(&mut frame_buffer, weather_error).await?;
             }
         }
+        let current_time = weather.as_ref().map(|w| w.current.time).ok();
+        let task_scheduler = current_time
+            .map(|t| persistent_state.scheduler.task_scheduler(t))
+            .unwrap_or_default();
+
+        display::draw_status_bar(
+            &mut frame_buffer,
+            &weather,
+            &task_scheduler,
+            last_run_statistics,
+        )
+        .await?;
 
         let _ = indicator.try_send(IndicatorState::UpdatingScreen);
         display.refresh(frame_buffer.as_bytes()).await?;
@@ -123,10 +130,6 @@ pub trait Device: DeviceInterface {
         while let Ok(input_event) = input.try_receive() {
             self.process_input(&input_event, persistent_state).await?;
         }
-        let current_time = weather.as_ref().map(|w| w.current.time).ok();
-        let task_scheduler = current_time
-            .map(|t| persistent_state.scheduler.task_scheduler(t))
-            .unwrap_or_default();
 
         let _ = indicator.try_send(IndicatorState::WritingConfiguration);
         let run_statistics = LastRunStatistics::successful();

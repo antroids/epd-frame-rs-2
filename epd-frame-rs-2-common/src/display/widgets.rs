@@ -12,6 +12,8 @@ use embedded_graphics::text::renderer::{CharacterStyle, TextRenderer};
 use embedded_layout::View;
 
 pub(crate) mod weather;
+
+#[allow(dead_code)]
 pub(crate) trait Widget: Drawable<Color = E6Color> + View {}
 
 #[derive(Clone)]
@@ -22,7 +24,7 @@ pub struct Text<'a, S: Clone> {
 
 impl<'a, S: TextRenderer + Clone> Text<'a, S> {
     pub fn new(text: &'a str, style: S, color: E6Color) -> Self {
-        let mut inner = embedded_graphics::text::Text::new(text, Default::default(), style);
+        let inner = embedded_graphics::text::Text::new(text, Default::default(), style);
 
         Self { inner, color }
     }

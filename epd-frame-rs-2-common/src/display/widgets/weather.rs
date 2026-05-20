@@ -1,12 +1,11 @@
 use crate::display::color::E6Color;
-use crate::display::image::E6ImageSource;
 use crate::display::weather::frog::Frog130x180;
-use crate::display::weather::{CurrentWeather, DailyWeather, HourlyWeather, Icon16, Icon64};
+use crate::display::weather::{CurrentWeather, DailyWeather, HourlyWeather, Icon64};
 use crate::display::widgets::weather::styles::{
     TEMPERATURE_FONT_12, TEMPERATURE_FONT_20, TEMPERATURE_FONT_50,
 };
 use crate::display::widgets::{Icon, RoundWidgetBorder, Text, Widget};
-use crate::display::{BinaryFontStyleType, DEFAULT_FONT_10_STYLE};
+use crate::display::{BinaryFontStyleType, DEFAULT_FONT_10_STYLE, Icon16};
 use alloc::format;
 use alloc::string::ToString;
 use core::f32::consts::PI;
@@ -14,12 +13,10 @@ use embedded_graphics::Drawable;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::{Point, Size};
 use embedded_graphics::pixelcolor::BinaryColor;
-use embedded_graphics::prelude::{Dimensions, Primitive};
+use embedded_graphics::prelude::Primitive;
 use embedded_graphics::primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable};
-use embedded_graphics::text::renderer::{CharacterStyle, TextRenderer};
 use embedded_layout::align::horizontal;
 use embedded_layout::prelude::{Align, vertical};
-use embedded_layout::view_group::ViewGroup;
 use embedded_layout::{View, ViewGroup};
 #[cfg(not(feature = "std"))]
 use micromath::F32Ext;
@@ -234,13 +231,15 @@ pub struct HourlyWeatherWidget<'a> {
     apparent_temperature: IconValue16<'a>,
     wind_speed: IconValue16<'a>,
     precipitation_probability: IconValue16<'a>,
+    uv_index: IconValue16<'a>,
+    humidity: IconValue16<'a>,
 }
 
 impl<'a> HourlyWeatherWidget<'a> {
     pub fn new(hourly_weather: &'a HourlyWeather, rand: &'a mut fastrand::Rng) -> Self {
         let time = hourly_weather.time.format("%_H:%M").to_string();
 
-        let frame = RoundWidgetBorder::new(Rectangle::new((0, 0).into(), (110, 180).into()));
+        let frame = RoundWidgetBorder::new(Rectangle::new((0, 0).into(), (110, 219).into()));
         let mut date_time = Text::new(time.leak(), styles::date_time_style(), E6Color::Black);
         let mut weather_icon_background = WeatherIconBackground::new((102, 54).into(), rand.fork());
         let mut weather_icon = Icon::new(&hourly_weather.weather_icon);
@@ -248,7 +247,7 @@ impl<'a> HourlyWeatherWidget<'a> {
         let mut temperature_small = Text::new(
             format!("{:+}C°", hourly_weather.temperature.round() as u32).leak(),
             BitmapFontStyle::new(&TEMPERATURE_FONT_20, BinaryColor::On),
-            E6Color::Black,
+            styles::temperature_color(hourly_weather.temperature),
         );
         let mut apparent_temperature = IconValue16::new(
             &Icon16::Temperature,
@@ -274,21 +273,34 @@ impl<'a> HourlyWeatherWidget<'a> {
             .leak(),
             E6Color::Black,
         );
+        let mut humidity = IconValue16::new(
+            &Icon16::Humidity,
+            format!("{}%", hourly_weather.humidity).leak(),
+            E6Color::Black,
+        );
+        let mut uv_index = IconValue16::new(
+            &Icon16::Uv,
+            format!("{}", hourly_weather.uv_index).leak(),
+            E6Color::Black,
+        );
 
         date_time.translate_mut((0, 18).into()).align_to_mut(
             &frame,
             horizontal::Center,
             vertical::NoAlignment,
         );
-        weather_icon_background.translate_mut((4, 76).into());
-        weather_icon.translate_mut((23, 16).into());
-        wind_arrow.translate_mut((90, 30).into());
+        weather_icon_background.translate_mut((4, 80).into());
+        weather_icon.translate_mut((23, 20).into());
+        wind_arrow.translate_mut((90, 34).into());
         temperature_small
-            .translate_mut((15, 110).into())
+            .translate_mut((15, 114).into())
             .align_to_mut(&frame, horizontal::Center, vertical::NoAlignment);
-        apparent_temperature.translate_mut((4, 126).into());
-        wind_speed.translate_mut((4, 142).into());
-        precipitation_probability.translate_mut((4, 160).into());
+        let details_offset = 127;
+        apparent_temperature.translate_mut((4, details_offset).into());
+        wind_speed.translate_mut((4, details_offset + 18).into());
+        precipitation_probability.translate_mut((4, details_offset + 18 * 2).into());
+        humidity.translate_mut((4, details_offset + 18 * 3).into());
+        uv_index.translate_mut((4, details_offset + 18 * 4).into());
 
         Self {
             frame,
@@ -300,6 +312,8 @@ impl<'a> HourlyWeatherWidget<'a> {
             apparent_temperature,
             wind_speed,
             precipitation_probability,
+            humidity,
+            uv_index,
         }
     }
 }
@@ -321,6 +335,8 @@ impl Drawable for HourlyWeatherWidget<'_> {
         self.apparent_temperature.draw(target)?;
         self.wind_speed.draw(target)?;
         self.precipitation_probability.draw(target)?;
+        self.humidity.draw(target)?;
+        self.uv_index.draw(target)?;
         Ok(())
     }
 }
@@ -337,13 +353,15 @@ pub struct DailyWeatherWidget<'a> {
     apparent_temperature: IconValue16<'a>,
     wind_speed: IconValue16<'a>,
     precipitation_probability: IconValue16<'a>,
+    humidity: IconValue16<'a>,
+    uv_index_max: IconValue16<'a>,
 }
 
 impl<'a> DailyWeatherWidget<'a> {
     pub fn new(daily_weather: &'a DailyWeather, rand: &'a mut fastrand::Rng) -> Self {
         let date = daily_weather.time.format("%A").to_string();
 
-        let frame = RoundWidgetBorder::new(Rectangle::new((0, 0).into(), (110, 200).into()));
+        let frame = RoundWidgetBorder::new(Rectangle::new((0, 0).into(), (110, 239).into()));
         let mut date = Text::new(date.leak(), styles::date_time_style(), E6Color::Black);
         let mut weather_icon_background = WeatherIconBackground::new((102, 54).into(), rand.fork());
         let mut weather_icon = Icon::new(&daily_weather.weather_icon);
@@ -351,12 +369,12 @@ impl<'a> DailyWeatherWidget<'a> {
         let mut temperature_small = Text::new(
             format!("{:+}C°", daily_weather.temperature_max.round() as u32).leak(),
             BitmapFontStyle::new(&TEMPERATURE_FONT_20, BinaryColor::On),
-            E6Color::Black,
+            styles::temperature_color(daily_weather.temperature_max),
         );
         let mut temperature_small_secondary = Text::new(
             format!("{:+}C°", daily_weather.temperature_min.round() as u32).leak(),
             BitmapFontStyle::new(&TEMPERATURE_FONT_12, BinaryColor::On),
-            E6Color::Black,
+            styles::temperature_color(daily_weather.temperature_min),
         );
         let mut apparent_temperature = IconValue16::new(
             &Icon16::Temperature,
@@ -382,24 +400,37 @@ impl<'a> DailyWeatherWidget<'a> {
             .leak(),
             E6Color::Black,
         );
+        let mut humidity = IconValue16::new(
+            &Icon16::Humidity,
+            format!("{}%", daily_weather.humidity).leak(),
+            E6Color::Black,
+        );
+        let mut uv_index_max = IconValue16::new(
+            &Icon16::Uv,
+            format!("{}", daily_weather.uv_index_max).leak(),
+            E6Color::Black,
+        );
 
         date.translate_mut((0, 18).into()).align_to_mut(
             &frame,
             horizontal::Center,
             vertical::NoAlignment,
         );
-        weather_icon_background.translate_mut((4, 76).into());
-        weather_icon.translate_mut((23, 16).into());
-        wind_arrow.translate_mut((90, 30).into());
+        weather_icon_background.translate_mut((4, 80).into());
+        weather_icon.translate_mut((23, 20).into());
+        wind_arrow.translate_mut((90, 34).into());
         temperature_small
-            .translate_mut((15, 110).into())
+            .translate_mut((15, 114).into())
             .align_to_mut(&frame, horizontal::Center, vertical::NoAlignment);
         temperature_small_secondary
-            .translate_mut((35, 132).into())
+            .translate_mut((35, 136).into())
             .align_to_mut(&frame, horizontal::Center, vertical::NoAlignment);
-        apparent_temperature.translate_mut((4, 144).into());
-        wind_speed.translate_mut((4, 162).into());
-        precipitation_probability.translate_mut((4, 180).into());
+        let details_offset = 147;
+        apparent_temperature.translate_mut((4, details_offset).into());
+        wind_speed.translate_mut((4, details_offset + 18).into());
+        precipitation_probability.translate_mut((4, details_offset + 18 * 2).into());
+        humidity.translate_mut((4, details_offset + 18 * 3).into());
+        uv_index_max.translate_mut((4, details_offset + 18 * 4).into());
 
         Self {
             frame,
@@ -412,6 +443,8 @@ impl<'a> DailyWeatherWidget<'a> {
             apparent_temperature,
             wind_speed,
             precipitation_probability,
+            humidity,
+            uv_index_max,
         }
     }
 }
@@ -434,6 +467,9 @@ impl Drawable for DailyWeatherWidget<'_> {
         self.apparent_temperature.draw(target)?;
         self.wind_speed.draw(target)?;
         self.precipitation_probability.draw(target)?;
+        self.humidity.draw(target)?;
+        self.uv_index_max.draw(target)?;
+
         Ok(())
     }
 }
@@ -461,7 +497,7 @@ impl<'a> CurrentWeatherWidget<'a> {
         let mut temperature = Text::new(
             format!("{:+}C°", current_weather.temperature.round() as u32).leak(),
             BitmapFontStyle::new(&TEMPERATURE_FONT_50, BinaryColor::On),
-            E6Color::Black,
+            styles::temperature_color(current_weather.temperature),
         );
         let mut apparent_temperature_label = Text::new(
             "Feels like ",
@@ -479,24 +515,26 @@ impl<'a> CurrentWeatherWidget<'a> {
         );
         let mut weather_details = Text::new(
             format!(
-                "Wind: {:}km/h ({:}km/h)\nHumidity: {:}%\nPrecipitation: {:}mm",
+                "Wind: {:}km/h ({:}km/h)\nHumidity: {:}%\nPrecipitation: {:}mm\nCloud cover: {:}% UV: {:}",
                 current_weather.wind_speed,
                 current_weather.wind_gusts,
                 current_weather.humidity,
                 current_weather.precipitation,
+                current_weather.cloud_cover,
+                current_weather.uv_index,
             )
             .leak(),
             styles::current_weather_details_style(),
             E6Color::Black,
         );
 
-        frog_icon.translate_mut((210, 0).into());
+        frog_icon.translate_mut((210, 32).into());
         date_time.translate_mut((5, 17).into());
-        temperature.translate_mut((5, 75).into());
-        apparent_temperature_label.translate_mut((5, 105).into());
+        temperature.translate_mut((5, 82).into());
+        apparent_temperature_label.translate_mut((5, 120).into());
         apparent_temperature
-            .translate_mut((apparent_temperature_label.size().width as i32 + 12, 105).into());
-        weather_details.translate_mut((5, 130).into());
+            .translate_mut((apparent_temperature_label.size().width as i32 + 12, 120).into());
+        weather_details.translate_mut((5, 144).into());
 
         Self {
             frog_icon,

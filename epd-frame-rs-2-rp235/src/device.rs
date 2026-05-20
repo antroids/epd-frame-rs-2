@@ -30,6 +30,8 @@ use static_cell::{StaticCell, make_static};
 const LAST_RUN_STATISTICS_OFFSET: u32 = 1024 * 4;
 const POWMAN_PASSWORD: u32 = 0x5AFE << 16;
 
+const WATCHDOG_TIMEOUT: embassy_time::Duration = embassy_time::Duration::from_secs(30);
+
 pub mod button;
 pub mod flash;
 pub mod wifi;
@@ -52,6 +54,7 @@ pub struct Rp235Device {
     device_indicator: &'static DeviceIndicator,
     spawner: Spawner,
     aon_timer: embassy_rp::aon_timer::AonTimer<'static>,
+    display_pwr: gpio::Output<'static>,
 }
 
 impl DeviceInterface for Rp235Device {
@@ -75,6 +78,7 @@ impl DeviceInterface for Rp235Device {
         network_config: &NetworkConfig,
     ) -> Result<(), DeviceError> {
         let seed = self.rand().await;
+        self.feed_watchdog();
         self.network_stack
             .init_network_stack(seed, network_config)
             .await
@@ -89,9 +93,10 @@ impl DeviceInterface for Rp235Device {
     }
 
     async fn start_wifi_ap(
-        &self,
+        &mut self,
         wifi_access_point_options: &WifiAccessPointOptions,
     ) -> Result<(), DeviceError> {
+        self.disable_watchdog();
         self.network_stack
             .start_ap(&self.spawner, wifi_access_point_options)
             .await
@@ -106,6 +111,7 @@ impl DeviceInterface for Rp235Device {
     }
 
     async fn rand(&mut self) -> u64 {
+        self.feed_watchdog();
         self.trng.blocking_next_u64()
     }
 
@@ -113,6 +119,7 @@ impl DeviceInterface for Rp235Device {
         &mut self,
     ) -> Result<&mut impl epd_frame_rs_2_common::display::epd_spectra_6::DisplayDriver, DeviceError>
     {
+        self.feed_watchdog();
         Ok(&mut self.display)
     }
 
@@ -146,6 +153,7 @@ impl DeviceInterface for Rp235Device {
         }
         defmt::flush();
 
+        self.display_pwr.set_low();
         low_power_mode();
         self.aon_timer.wait_for_alarm().await;
 
@@ -153,6 +161,7 @@ impl DeviceInterface for Rp235Device {
     }
 
     async fn power_off_radio_module(&mut self) -> Result<(), DeviceError> {
+        self.feed_watchdog();
         self.network_stack.deinitialize_network_stack();
         unsafe {
             let pwr = embassy_rp::peripherals::PIN_23::steal();
@@ -177,7 +186,7 @@ impl Device for Rp235Device {}
 impl Rp235Device {
     pub async fn new(spawner: Spawner) -> Result<Self, DeviceError> {
         let peripherals = embassy_rp::init(Default::default());
-        let watchdog = Watchdog::new(peripherals.WATCHDOG);
+        let mut watchdog = Watchdog::new(peripherals.WATCHDOG);
 
         info!(
             "Config start: {}, length: {}",
@@ -220,6 +229,7 @@ impl Rp235Device {
         static DISPLAY_SPI_MUTEX: StaticCell<
             Mutex<CriticalSectionRawMutex, embassy_rp::spi::Spi<SPI1, Async>>,
         > = StaticCell::new();
+        let display_pwr = gpio::Output::new(peripherals.PIN_3, gpio::Level::High);
         let display_spi = DISPLAY_SPI_MUTEX.init(Mutex::new(display_spi));
         let display_cs = gpio::Output::new(peripherals.PIN_13, gpio::Level::High);
         let display_dc = gpio::Output::new(peripherals.PIN_6, gpio::Level::High);
@@ -245,8 +255,8 @@ impl Rp235Device {
             },
         );
 
-        info!("PWM max frequency {}", led.max_duty_cycle());
-
+        watchdog.pause_on_debug(true);
+        watchdog.start(embassy_time::Duration::from_secs(10));
         button::spawn_button_task(button, device_input.sender(), &spawner)?;
         spawner.spawn(indicator_led(led, device_indicator.receiver())?);
 
@@ -260,7 +270,16 @@ impl Rp235Device {
             device_indicator,
             spawner,
             aon_timer,
+            display_pwr,
         })
+    }
+
+    fn feed_watchdog(&mut self) {
+        self.watchdog.feed(WATCHDOG_TIMEOUT);
+    }
+
+    fn disable_watchdog(&mut self) {
+        self.watchdog.stop();
     }
 }
 

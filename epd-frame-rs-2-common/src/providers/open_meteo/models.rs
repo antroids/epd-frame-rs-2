@@ -24,6 +24,7 @@ pub struct HourlyWeather {
     pub precipitation_probability: Vec<u32>,
     pub weather_code: Vec<WeatherCode>,
     pub is_day: Vec<u8>,
+    pub uv_index: Vec<weather::UvIndex>,
 }
 
 /// For each selected daily weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
@@ -32,6 +33,7 @@ pub struct DailyWeather {
     pub time: Vec<NaiveDate>,
     pub temperature_2m_max: Vec<f32>,
     pub temperature_2m_min: Vec<f32>,
+    pub relative_humidity_2m_mean: Vec<f32>,
     pub apparent_temperature_max: Vec<f32>,
     pub apparent_temperature_min: Vec<f32>,
     pub precipitation_sum: Vec<f32>,
@@ -40,6 +42,7 @@ pub struct DailyWeather {
     pub wind_speed_10m_max: Vec<f32>,
     pub wind_gusts_10m_max: Vec<f32>,
     pub wind_direction_10m_dominant: Vec<f32>,
+    pub uv_index_max: Vec<weather::UvIndex>,
 }
 
 /// Current weather conditions with the attributes: time, temperature, wind_speed, wind_direction and weather_code
@@ -56,6 +59,7 @@ pub struct CurrentWeather {
     pub cloud_cover: f32,
     pub weather_code: WeatherCode,
     pub is_day: u8,
+    pub uv_index: weather::UvIndex,
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -276,6 +280,7 @@ impl Response {
             temperature: self.hourly.temperature_2m[index],
             apparent_temperature: self.hourly.apparent_temperature[index],
             is_day: self.hourly.is_day[index] != 0,
+            humidity: self.hourly.relative_humidity_2m[index] as weather::Percentage,
             precipitation: self.hourly.precipitation[index],
             precipitation_probability: self.hourly.precipitation_probability[index]
                 as weather::Percentage,
@@ -287,6 +292,7 @@ impl Response {
             } else {
                 self.hourly.weather_code[index].into_night_icon()
             },
+            uv_index: self.hourly.uv_index[index],
         }
     }
 
@@ -295,6 +301,7 @@ impl Response {
             time: self.daily.time[index].and_hms_opt(0, 0, 0).unwrap().date(),
             temperature_max: self.daily.temperature_2m_max[index],
             temperature_min: self.daily.temperature_2m_min[index],
+            humidity: self.daily.relative_humidity_2m_mean[index] as weather::Percentage,
             apparent_temperature_max: self.daily.apparent_temperature_max[index],
             apparent_temperature_min: self.daily.apparent_temperature_min[index],
             precipitation: self.daily.precipitation_sum[index],
@@ -305,6 +312,7 @@ impl Response {
                 as weather::DirectionDegrees,
             wind_gusts: self.daily.wind_gusts_10m_max[index] as weather::SpeedKilometersPerHour,
             weather_icon: self.daily.weather_code[index].into_day_icon(),
+            uv_index_max: self.daily.uv_index_max[index],
         }
     }
 }
@@ -329,6 +337,7 @@ impl From<Response> for weather::Weather {
                 v.current.weather_code.into_night_icon()
             },
             cloud_cover: v.current.cloud_cover as weather::Percentage,
+            uv_index: v.current.uv_index,
         };
 
         let hourly = core::array::from_fn(|index| v.hourly_weather(index, timezone));

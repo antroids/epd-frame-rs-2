@@ -1,19 +1,22 @@
 use crate::display::color::{BinaryColorAdapter, E6Color};
 use crate::display::epd_spectra_6::FrameBuffer;
+use crate::display::image::E6ImageSource;
 use crate::display::weather::Weather;
 use crate::display::weather::frog::Frog130x180;
 use crate::display::widgets::weather::{
-    CurrentWeatherWidget, DailyWeatherWidget, HourlyWeatherWidget,
+    CurrentWeatherWidget, DailyWeatherWidget, HourlyWeatherWidget, IconValue16,
 };
 use crate::errors::DeviceError;
+use crate::scheduler::HourlyScheduler;
 use crate::storage::{LastRunStatistics, LastRunStatus};
 use alloc::format;
 use alloc::vec::Vec;
+use defmt_or_log::derive_format_or_debug;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::{Point, Size};
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::Dimensions;
-use embedded_graphics::primitives::{Rectangle, StyledDrawable};
+use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::text::Text;
 use embedded_graphics::{Drawable, Pixel};
 use embedded_layout::View;
@@ -67,6 +70,45 @@ pub const DEFAULT_FONT_10_STYLE: BinaryFontStyleType =
 
 pub struct CroppedDrawTarget<'a, D: DrawTarget>(pub &'a mut D, pub Rectangle);
 
+const HUMIDITY_16: &[u8] = include_bytes!("../resources/icons_16/humidity_16.e6spectra");
+const WATER_16: &[u8] = include_bytes!("../resources/icons_16/water_16.e6spectra");
+const TEMPERATURE_16: &[u8] = include_bytes!("../resources/icons_16/temperature_16.e6spectra");
+const WIND_16: &[u8] = include_bytes!("../resources/icons_16/wind_16.e6spectra");
+const UV_16: &[u8] = include_bytes!("../resources/icons_16/uv_16.e6spectra");
+const WIFI_16: &[u8] = include_bytes!("../resources/icons_16/wifi_16.e6spectra");
+const CLOCK_16: &[u8] = include_bytes!("../resources/icons_16/clock_16.e6spectra");
+
+#[derive(Clone, Copy)]
+#[derive_format_or_debug]
+#[repr(u8)]
+pub enum Icon16 {
+    Temperature,
+    Humidity,
+    Water,
+    Wind,
+    Uv,
+    Wifi,
+    Clock,
+}
+
+impl E6ImageSource for Icon16 {
+    fn source_bytes(&self) -> &[u8] {
+        match self {
+            Icon16::Temperature => TEMPERATURE_16,
+            Icon16::Humidity => HUMIDITY_16,
+            Icon16::Water => WATER_16,
+            Icon16::Wind => WIND_16,
+            Icon16::Uv => UV_16,
+            Icon16::Wifi => WIFI_16,
+            Icon16::Clock => CLOCK_16,
+        }
+    }
+
+    fn size(&self) -> Size {
+        (16, 16).into()
+    }
+}
+
 impl<'a, D: DrawTarget> DrawTarget for CroppedDrawTarget<'a, D> {
     type Color = D::Color;
     type Error = D::Error;
@@ -96,7 +138,7 @@ pub async fn draw_weather(
 ) -> Result<(), DeviceError> {
     let mut current_weather_target = CroppedDrawTarget(
         frame_buffer,
-        Rectangle::new(Point::new(0, 0), Size::new(340, 180)),
+        Rectangle::new(Point::new(0, 0), Size::new(340, 219)),
     );
     CurrentWeatherWidget::new(&weather.current).draw(&mut current_weather_target)?;
 
@@ -107,7 +149,7 @@ pub async fn draw_weather(
             .draw(frame_buffer)?;
     }
     for (index, daily) in weather.daily.iter().enumerate() {
-        let point = Point::new((110 + 5) * index as i32, 185);
+        let point = Point::new((110 + 5) * index as i32, 224);
         DailyWeatherWidget::new(daily, rand)
             .translate_mut(point)
             .draw(frame_buffer)?;
@@ -120,18 +162,14 @@ pub async fn draw_weather_error(
     error: &DeviceError,
 ) -> Result<(), DeviceError> {
     let text = format!("Weather Error: {}", error);
-    let boundaries = Rectangle::new(Point::new(0, 0), Size::new(800, 400));
+    let boundaries = Rectangle::new(Point::new(0, 0), Size::new(800, 480));
 
     widgets::Icon::new(&Frog130x180::Thunder)
         .align_to(&boundaries, horizontal::Center, vertical::Top)
         .draw(frame_buffer)?;
-    widgets::Text::new(
-        text.as_str(),
-        BitmapFontStyle::new(&DEFAULT_FONT_12, BinaryColor::On),
-        E6Color::Black,
-    )
-    .align_to(&boundaries, horizontal::Center, vertical::Center)
-    .draw(frame_buffer)?;
+    widgets::Text::new(text.as_str(), DEFAULT_FONT_10_STYLE, E6Color::Black)
+        .align_to(&boundaries, horizontal::Center, vertical::Center)
+        .draw(frame_buffer)?;
 
     Ok(())
 }
@@ -151,5 +189,53 @@ pub async fn draw_last_run_statistics(
             draw_target,
         )?;
     }
+    Ok(())
+}
+
+pub async fn draw_status_bar(
+    draw_target: &mut FrameBuffer<Vec<u8>>,
+    weather: &Result<Weather, DeviceError>,
+    task_scheduler: &HourlyScheduler,
+    last_status: &LastRunStatistics,
+) -> Result<(), DeviceError> {
+    let frame = Rectangle::new((5, 464).into(), (800, 16).into());
+    let (connection_status, connection_status_color) = match weather {
+        Ok(_) => ("Online", E6Color::Black),
+        Err(_) => ("Failed", E6Color::Red),
+    };
+    let last_status_text = match last_status.status {
+        LastRunStatus::None => format!(
+            "First run. Next run in: {} min",
+            task_scheduler.minutes_delay
+        ),
+        LastRunStatus::Successful => format!(
+            "Previous update was successful. Next run in: {} min",
+            task_scheduler.minutes_delay
+        ),
+        LastRunStatus::Failed => format!(
+            "Previous update failed: {:?}. Next run in: {} min",
+            last_status.failed_cause, task_scheduler.minutes_delay
+        ),
+    }
+    .leak();
+    let connection_status = IconValue16::new(
+        &Icon16::Wifi,
+        connection_status,
+        connection_status_color,
+    )
+    .align_to(&frame, horizontal::Left, vertical::Center);
+    let last_update =
+        IconValue16::new(&Icon16::Clock, last_status_text, E6Color::Black).translate(Point::new(
+            connection_status
+                .bounds()
+                .bottom_right()
+                .unwrap_or_default()
+                .x
+                + 5,
+            464,
+        ));
+
+    connection_status.draw(draw_target)?;
+    last_update.draw(draw_target)?;
     Ok(())
 }

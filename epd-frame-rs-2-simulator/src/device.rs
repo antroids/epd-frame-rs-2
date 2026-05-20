@@ -127,7 +127,7 @@ impl DeviceInterface for SimulatorDevice {
     }
 
     async fn start_wifi_ap(
-        &self,
+        &mut self,
         _wifi_access_point_options: &WifiAccessPointOptions,
     ) -> Result<(), DeviceError> {
         info!("Starting WiFi AP");

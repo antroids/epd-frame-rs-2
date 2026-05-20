@@ -9,14 +9,15 @@ pub mod models;
 pub fn request_url(latitude: f32, longitude: f32) -> String {
     format!(
         "http://api.open-meteo.com/v1/forecast?latitude={}&longitude={}\
-        &daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,\
+        &daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,relative_humidity_2m_mean,\
         precipitation_hours,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,\
-        wind_direction_10m_dominant,apparent_temperature_max,apparent_temperature_min\
+        wind_direction_10m_dominant,apparent_temperature_max,apparent_temperature_min,uv_index_max\
         &hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,\
-        precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,is_day\
+        precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,is_day,\
+        uv_index\
         &current=temperature_2m,is_day,relative_humidity_2m,apparent_temperature,\
         precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,\
-        cloud_cover&forecast_hours=24&temporal_resolution=hourly_6&timezone=auto",
+        cloud_cover,uv_index&forecast_hours=24&temporal_resolution=hourly_6&timezone=auto",
         latitude, longitude
     )
 }

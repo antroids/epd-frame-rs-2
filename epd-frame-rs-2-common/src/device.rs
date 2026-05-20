@@ -36,7 +36,7 @@ pub trait DeviceInterface {
     ) -> impl Future<Output = Result<(), DeviceError>>;
     fn leave_wifi(&self) -> impl Future<Output = Result<(), DeviceError>>;
     fn start_wifi_ap(
-        &self,
+        &mut self,
         wifi_access_point_options: &WifiAccessPointOptions,
     ) -> impl Future<Output = Result<(), DeviceError>>;
     fn scan(&self) -> impl Future<Output = Result<Vec<WifiNetworkScanRecord>, DeviceError>>;
