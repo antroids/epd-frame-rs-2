@@ -11,6 +11,7 @@ use crate::{display, http};
 use core::time::Duration;
 use defmt_or_log::{error, info};
 use embassy_executor::Spawner;
+use embassy_time::Timer;
 use embedded_graphics::geometry::Size;
 use picoserve::make_static;
 
@@ -35,6 +36,13 @@ pub trait Device: DeviceInterface {
             if last_run_statistics != run_statistics {
                 self.write_last_run_statistics(&run_statistics).await;
             }
+            let input = self.input_receiver();
+            Timer::after_secs(10).await;
+            while let Ok(input_event) = input.try_receive() {
+                let persistent_state = self.read_persistent_state().await.unwrap_or_default();
+                let _ = self.process_input(&input_event, persistent_state).await;
+            }
+            let _ = indicator.try_send(IndicatorState::Off);
             let _ = self.power_off_for(ERROR_SLEEP_DURATION).await;
             error!("Failed to sleep after error");
             let _ = self.reset().await;
@@ -46,6 +54,7 @@ pub trait Device: DeviceInterface {
         spawner: Spawner,
         last_run_statistics: &LastRunStatistics,
     ) -> Result<(), DeviceError> {
+        info!("Starting main loop");
         let indicator = self.indicator_sender();
 
         let _ = indicator.try_send(IndicatorState::ReadingConfiguration);
@@ -170,6 +179,11 @@ pub trait Device: DeviceInterface {
             display.refresh(frame_buffer.as_bytes()).await?;
         }
 
+        let input_receiver = self.input_receiver();
+        while let Ok(input_event) = input_receiver.try_receive() {
+            self.process_input(&input_event, persistent_state).await?;
+        }
+
         let _ = indicator.try_send(IndicatorState::StartingWifiAccessPoint);
         self.init_network_stack(&persistent_state.wifi_access_point_network_config)
             .await?;
@@ -191,7 +205,6 @@ pub trait Device: DeviceInterface {
         )?;
         info!("HTTP server started");
 
-        let input_receiver = self.input_receiver();
         loop {
             use embassy_futures::select::{Either, select};
 

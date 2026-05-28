@@ -11,6 +11,7 @@ defmt = ["defmt-or-log/defmt", "embassy-net/defmt", "sntpc/defmt", "sntpc-net-em
 log = ["defmt-or-log/log", "sntpc/log", "sntpc-net-embassy/log", "dep:log", "reqwless/log", "picoserve/log",
     "embassy-sync/log", "embassy-futures/log", "embedded-tls/log"]
 std = ["picoserve/std", "embassy-sync/std", "embedded-tls/std"]
+tls = ["der", "embedded-tls", "reqwless/embedded-tls"]
 
 [dependencies]
 defmt = { workspace = true }
@@ -42,9 +43,9 @@ micromath = { version = "2.1.0", default-features = false }
 fastrand = { version = "2.4.1", features = ["alloc"], default-features = false }
 qrcodegen-no-heap = { version = "1.8.1" }
 
-reqwless = { workspace = true, features = ["embedded-tls"] }
+reqwless = { workspace = true }
 picoserve = { version = "0.18.0", features = ["embassy", "alloc"], default-features = false }
 maud = { version = "0.27.0" }
 
-der = { version = "0.8.0-rc.2", features = ["derive", "oid", "time", "heapless"]}
-embedded-tls = { version = "0.18.0", features = ["alloc"], default-features = false }
+der = { version = "0.8.0-rc.2", features = ["derive", "oid", "time", "heapless"], optional = true}
+embedded-tls = { version = "0.18.0", features = ["alloc"], default-features = false, optional = true }

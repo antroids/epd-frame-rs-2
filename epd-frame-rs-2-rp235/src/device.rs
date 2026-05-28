@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use core::arch::asm;
 use core::time::Duration;
-use defmt::warn;
+use defmt::{error, info, warn};
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_executor::Spawner;
 use embassy_rp::peripherals::{DMA_CH0, DMA_CH1, DMA_CH2, DMA_CH3, PIO0, SPI1, TRNG};
@@ -24,13 +24,12 @@ use epd_frame_rs_2_common::types::LimitedString;
 use epd_frame_rs_2_common::wifi::{
     NetworkConfig, WifiAccessPointOptions, WifiJoinOptions, WifiNetworkScanRecord,
 };
-use log::info;
 use static_cell::{StaticCell, make_static};
 
 const LAST_RUN_STATISTICS_OFFSET: u32 = 1024 * 4;
 const POWMAN_PASSWORD: u32 = 0x5AFE << 16;
 
-const WATCHDOG_TIMEOUT: embassy_time::Duration = embassy_time::Duration::from_secs(30);
+const WATCHDOG_TIMEOUT: embassy_time::Duration = embassy_time::Duration::from_secs(15);
 
 pub mod button;
 pub mod flash;
@@ -197,13 +196,14 @@ impl Rp235Device {
         let trng = Trng::new(peripherals.TRNG, Irqs, embassy_rp::trng::Config::default());
         let config_offset =
             unsafe { &__config_start as *const u32 as u32 - embassy_rp::flash::FLASH_BASE as u32 };
-        let flash = flash::Flash::new(
+        let mut flash = flash::Flash::new(
             peripherals.FLASH,
             peripherals.DMA_CH1,
             Irqs,
             config_offset,
             config_offset + LAST_RUN_STATISTICS_OFFSET,
         );
+        failsafe(&mut flash).await?;
         let network_stack = wifi::WifiStack::new(
             Irqs,
             peripherals.PIN_25,
@@ -216,6 +216,9 @@ impl Rp235Device {
         )
         .await?;
 
+        //clk - 10
+        //mosi - 11
+        //miso - 12
         let display_spi = embassy_rp::spi::Spi::new(
             peripherals.SPI1,
             peripherals.PIN_10,
@@ -256,7 +259,7 @@ impl Rp235Device {
         );
 
         watchdog.pause_on_debug(true);
-        watchdog.start(embassy_time::Duration::from_secs(10));
+        //watchdog.start(WATCHDOG_TIMEOUT);
         button::spawn_button_task(button, device_input.sender(), &spawner)?;
         spawner.spawn(indicator_led(led, device_indicator.receiver())?);
 
@@ -306,6 +309,7 @@ fn low_power_mode() {
     pac::CLOCKS.clk_peri_ctrl().modify(|r| r.set_enabled(false));
 
     disable_usb();
+    //disable_gpio_pull();
 
     pac::POWMAN.state().modify(|r| {
         r.set_req(0b00001111);
@@ -333,6 +337,63 @@ fn disable_usb() {
     });
 }
 
+// fn disable_gpio_pull() {
+//     for gpio_index in 0..48 {
+//         pac::PADS_BANK0.gpio(gpio_index).modify(|r| {
+//             r.set_pde(false);
+//             r.set_pue(false);
+//             r.set_od(true);
+//             r.set_ie(true);
+//         });
+//     }
+// }
+//
+// fn unlatch_gpio() {
+//     for gpio_index in 0..48 {
+//         pac::PADS_BANK0.gpio(gpio_index).modify(|r| {
+//             r.set_ie(true);
+//             r.set_od(false);
+//             r.set_pde(true);
+//             r.set_pue(false);
+//         });
+//     }
+// }
+
+fn store_indicator_state(state: IndicatorState) {
+    pac::WATCHDOG.scratch7().write_value(state as u32);
+}
+
+fn read_indicator_state() -> IndicatorState {
+    (pac::WATCHDOG
+        .scratch7()
+        .read() as u8)
+        .try_into()
+        .unwrap_or_default()
+}
+
+async fn failsafe(flash: &mut flash::Flash) -> Result<(), DeviceError> {
+    info!("Checking if failsafe is required");
+    let last_indicator_state = read_indicator_state();
+
+    match last_indicator_state {
+        IndicatorState::Off | IndicatorState::Error => {
+            info!("Failsafe is not required");
+        }
+        IndicatorState::Loading | IndicatorState::ReadingConfiguration | IndicatorState::JoiningWifi => {
+            error!("The failed execution probably caused by wrong configuration, resetting the configuration");
+            flash.write_persistent_state(&PersistentState::default()).await?;
+        }
+        state => {
+            error!(
+                "The last indicator state is {}, failsafe operation is not defined",
+                state
+            );
+        }
+    }
+
+    Ok(())
+}
+
 unsafe extern "C" {
     // Flash storage used for configuration
     static __config_start: u32;
@@ -347,31 +408,12 @@ bind_interrupts!(pub struct Irqs {
 });
 
 #[embassy_executor::task]
-async fn blink_led(mut led: gpio::Output<'static>) {
-    loop {
-        led.set_low();
-        Timer::after_millis(500).await;
-        led.set_high();
-        Timer::after_millis(500).await;
-    }
-}
-
-#[embassy_executor::task]
 async fn indicator_led(mut led: pwm::Pwm<'static>, receiver: DeviceIndicatorReceiver) {
     loop {
-        let duty_cycle_percent = match receiver.receive().await {
-            IndicatorState::Off => 0,
-            IndicatorState::Loading => 5,
-            IndicatorState::ReadingConfiguration => 10,
-            IndicatorState::WritingConfiguration => 15,
-            IndicatorState::HttpRequest => 20,
-            IndicatorState::JoiningWifi => 25,
-            IndicatorState::StartingWifiAccessPoint => 25,
-            IndicatorState::ConfigurationMode => 30,
-            IndicatorState::RenderingImage => 40,
-            IndicatorState::UpdatingScreen => 50,
-            IndicatorState::Error => 80,
-        };
+        let new_indicator_state = receiver.receive().await;
+        store_indicator_state(new_indicator_state);
+        info!("Indicator state: {}", new_indicator_state);
+        let duty_cycle_percent = new_indicator_state as u8;
 
         let _ = led.set_duty_cycle_percent(duty_cycle_percent);
     }

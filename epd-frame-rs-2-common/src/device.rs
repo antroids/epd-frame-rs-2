@@ -5,6 +5,7 @@ use crate::wifi::{
     NetworkConfig, WifiAccessPointOptions, WifiJoinOptions, WifiNetworkScanRecord,
 };
 use alloc::vec::Vec;
+use core::convert::TryFrom;
 use core::time::Duration;
 use defmt_or_log::derive_format_or_debug;
 use embassy_sync::channel::{Channel, Receiver, Sender};
@@ -84,16 +85,37 @@ pub type DeviceIndicatorReceiver = Receiver<'static, crate::RawMutex, IndicatorS
 #[repr(u8)]
 pub enum IndicatorState {
     #[default]
-    Off,
-    Loading,
-    ReadingConfiguration,
-    WritingConfiguration,
-    HttpRequest,
-    JoiningWifi,
-    StartingWifiAccessPoint,
-    ConfigurationMode,
-    RenderingImage,
-    UpdatingScreen,
-    Error,
+    Off = 0,
+    Loading = 5,
+    ReadingConfiguration = 10,
+    WritingConfiguration = 15,
+    HttpRequest = 20,
+    JoiningWifi = 25,
+    StartingWifiAccessPoint = 30,
+    ConfigurationMode = 35,
+    RenderingImage = 40,
+    UpdatingScreen = 45,
+    Error = 50,
+}
+
+impl TryFrom<u8> for IndicatorState {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, ()> {
+        match value {
+            0 => Ok(IndicatorState::Off),
+            5 => Ok(IndicatorState::Loading),
+            10 => Ok(IndicatorState::ReadingConfiguration),
+            15 => Ok(IndicatorState::WritingConfiguration),
+            20 => Ok(IndicatorState::HttpRequest),
+            25 => Ok(IndicatorState::JoiningWifi),
+            30 => Ok(IndicatorState::StartingWifiAccessPoint),
+            35 => Ok(IndicatorState::ConfigurationMode),
+            40 => Ok(IndicatorState::RenderingImage),
+            45 => Ok(IndicatorState::UpdatingScreen),
+            50 => Ok(IndicatorState::Error),
+            _ => Err(()),
+        }
+    }
 }
 
