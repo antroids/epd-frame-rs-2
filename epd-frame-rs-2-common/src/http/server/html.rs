@@ -368,8 +368,8 @@ pub fn render_page(state: &PersistentState) -> maud::Markup {
                         <legend style="font-size:.9rem">Fill Range</legend>
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.5rem;align-items:end">
                             <label style="margin:0">
-                                Value (0-59)
-                                <input type="number" id="fill-value" min="0" max="59" value="20" 
+                                Value (0-255)
+                                <input type="number" id="fill-value" min="0" max="255" value="20" 
                                        style="width:100%;padding:.3rem">
                             </label>
                             <label style="margin:0">
@@ -398,13 +398,61 @@ pub fn render_page(state: &PersistentState) -> maud::Markup {
                             </label>
                             <label style="margin:0">
                                 From Hour
-                                <input type="number" id="fill-from-hour" min="0" max="23" value="7" 
-                                       style="width:100%;padding:.3rem">
+                                <select id="fill-from-hour" style="width:100%;padding:.3rem">
+                                    <option value="0">00</option>
+                                    <option value="1">01</option>
+                                    <option value="2">02</option>
+                                    <option value="3">03</option>
+                                    <option value="4">04</option>
+                                    <option value="5">05</option>
+                                    <option value="6">06</option>
+                                    <option value="7" selected>07</option>
+                                    <option value="8">08</option>
+                                    <option value="9">09</option>
+                                    <option value="10">10</option>
+                                    <option value="11">11</option>
+                                    <option value="12">12</option>
+                                    <option value="13">13</option>
+                                    <option value="14">14</option>
+                                    <option value="15">15</option>
+                                    <option value="16">16</option>
+                                    <option value="17">17</option>
+                                    <option value="18">18</option>
+                                    <option value="19">19</option>
+                                    <option value="20">20</option>
+                                    <option value="21">21</option>
+                                    <option value="22">22</option>
+                                    <option value="23">23</option>
+                                </select>
                             </label>
                             <label style="margin:0">
                                 To Hour
-                                <input type="number" id="fill-to-hour" min="0" max="23" value="9" 
-                                       style="width:100%;padding:.3rem">
+                                <select id="fill-to-hour" style="width:100%;padding:.3rem">
+                                    <option value="0">00</option>
+                                    <option value="1">01</option>
+                                    <option value="2">02</option>
+                                    <option value="3">03</option>
+                                    <option value="4">04</option>
+                                    <option value="5">05</option>
+                                    <option value="6">06</option>
+                                    <option value="7">07</option>
+                                    <option value="8">08</option>
+                                    <option value="9" selected>09</option>
+                                    <option value="10">10</option>
+                                    <option value="11">11</option>
+                                    <option value="12">12</option>
+                                    <option value="13">13</option>
+                                    <option value="14">14</option>
+                                    <option value="15">15</option>
+                                    <option value="16">16</option>
+                                    <option value="17">17</option>
+                                    <option value="18">18</option>
+                                    <option value="19">19</option>
+                                    <option value="20">20</option>
+                                    <option value="21">21</option>
+                                    <option value="22">22</option>
+                                    <option value="23">23</option>
+                                </select>
                             </label>
                             <button type="button" onclick="fillRange()" 
                                     style="padding:.4rem 1rem;background:#27ae60;color:#fff;border:none;border-radius:4px;cursor:pointer;white-space:nowrap">
