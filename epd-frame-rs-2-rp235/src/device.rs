@@ -152,7 +152,7 @@ impl DeviceInterface for Rp235Device {
         }
         defmt::flush();
 
-        self.display_pwr.set_low();
+        self.disable_display();
         low_power_mode();
         self.aon_timer.wait_for_alarm().await;
 
@@ -232,7 +232,7 @@ impl Rp235Device {
         static DISPLAY_SPI_MUTEX: StaticCell<
             Mutex<CriticalSectionRawMutex, embassy_rp::spi::Spi<SPI1, Async>>,
         > = StaticCell::new();
-        let display_pwr = gpio::Output::new(peripherals.PIN_3, gpio::Level::High);
+        let display_pwr = gpio::Output::new(peripherals.PIN_3, gpio::Level::Low);
         let display_spi = DISPLAY_SPI_MUTEX.init(Mutex::new(display_spi));
         let display_cs = gpio::Output::new(peripherals.PIN_13, gpio::Level::High);
         let display_dc = gpio::Output::new(peripherals.PIN_6, gpio::Level::High);
@@ -259,7 +259,7 @@ impl Rp235Device {
         );
 
         watchdog.pause_on_debug(true);
-        //watchdog.start(WATCHDOG_TIMEOUT);
+        watchdog.start(WATCHDOG_TIMEOUT);
         button::spawn_button_task(button, device_input.sender(), &spawner)?;
         spawner.spawn(indicator_led(led, device_indicator.receiver())?);
 
@@ -283,6 +283,10 @@ impl Rp235Device {
 
     fn disable_watchdog(&mut self) {
         self.watchdog.stop();
+    }
+
+    fn disable_display(&mut self) {
+        self.display_pwr.set_high();
     }
 }
 
@@ -309,7 +313,7 @@ fn low_power_mode() {
     pac::CLOCKS.clk_peri_ctrl().modify(|r| r.set_enabled(false));
 
     disable_usb();
-    //disable_gpio_pull();
+    disable_gpio_pull();
 
     pac::POWMAN.state().modify(|r| {
         r.set_req(0b00001111);
@@ -337,16 +341,16 @@ fn disable_usb() {
     });
 }
 
-// fn disable_gpio_pull() {
-//     for gpio_index in 0..48 {
-//         pac::PADS_BANK0.gpio(gpio_index).modify(|r| {
-//             r.set_pde(false);
-//             r.set_pue(false);
-//             r.set_od(true);
-//             r.set_ie(true);
-//         });
-//     }
-// }
+fn disable_gpio_pull() {
+    for gpio_index in 0..48 {
+        pac::PADS_BANK0.gpio(gpio_index).modify(|r| {
+            r.set_pde(false);
+            r.set_pue(false);
+            r.set_od(true);
+            r.set_ie(true);
+        });
+    }
+}
 //
 // fn unlatch_gpio() {
 //     for gpio_index in 0..48 {
