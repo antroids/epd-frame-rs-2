@@ -7,10 +7,11 @@ use crate::errors::DeviceError;
 use crate::http::server::ServerAction;
 use crate::providers::open_meteo;
 use crate::storage::{LastRunStatistics, PersistentState};
-use crate::{display, http};
+use crate::{display, http, Validate};
 use core::time::Duration;
 use defmt_or_log::{error, info};
 use embassy_executor::Spawner;
+use embassy_futures::select::{Either3, select3};
 use embassy_time::Timer;
 use embedded_graphics::geometry::Size;
 use picoserve::make_static;
@@ -58,13 +59,21 @@ pub trait Device: DeviceInterface {
         let indicator = self.indicator_sender();
 
         let _ = indicator.try_send(IndicatorState::ReadingConfiguration);
-        let persistent_state = self.read_persistent_state().await.unwrap_or_else(|e| {
+        let mut persistent_state = self.read_persistent_state().await.unwrap_or_else(|e| {
             error!(
                 "Persistent state read error: {:?}, falling back to default",
                 e
             );
             PersistentState::default()
         });
+
+        if let Err(validation_error) = persistent_state.validate() {
+            error!(
+                "Persistent state validation error: {:?}, falling back to default",
+                validation_error
+            );
+            persistent_state = PersistentState::default();
+        }
 
         if persistent_state.connect_to_wifi.as_bool() {
             self.online_mode_loop(persistent_state, last_run_statistics)
@@ -83,13 +92,16 @@ pub trait Device: DeviceInterface {
         last_run_statistics: &LastRunStatistics,
     ) -> Result<(), DeviceError> {
         let indicator = self.indicator_sender();
+        let watchdog = self.watchdog_sender();
 
         let _ = indicator.try_send(IndicatorState::JoiningWifi);
+        let _ = watchdog.try_send(15_000_000);
         self.init_network_stack(&persistent_state.wifi_join_network_config)
             .await?;
         self.join_wifi(&persistent_state.wifi_join_options).await?;
 
         let _ = indicator.try_send(IndicatorState::HttpRequest);
+        let _ = watchdog.try_send(5_000_000);
         let mut http_client = self.http_client().await?;
         let weather = open_meteo::get_weather(
             &mut http_client,
@@ -102,8 +114,10 @@ pub trait Device: DeviceInterface {
         self.power_off_radio_module().await?;
 
         let _ = indicator.try_send(IndicatorState::RenderingImage);
+        let _ = watchdog.try_send(5_000_000);
         let seed = self.rand().await;
         let mut rand = fastrand::Rng::with_seed(seed);
+        let battery_voltage = self.voltage();
         let display = self.display().await?;
         let mut frame_buffer = FrameBuffer::new(
             Size::new(DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32),
@@ -128,10 +142,12 @@ pub trait Device: DeviceInterface {
             &weather,
             &task_scheduler,
             last_run_statistics,
+            battery_voltage,
         )
         .await?;
 
         let _ = indicator.try_send(IndicatorState::UpdatingScreen);
+        let _ = watchdog.try_send(30_000_000);
         display.refresh(frame_buffer.as_bytes()).await?;
         info!("Display refreshed");
 
@@ -141,6 +157,7 @@ pub trait Device: DeviceInterface {
         }
 
         let _ = indicator.try_send(IndicatorState::WritingConfiguration);
+        let _ = watchdog.try_send(5_000_000);
         let run_statistics = LastRunStatistics::successful();
         if run_statistics != *last_run_statistics {
             self.write_last_run_statistics(&run_statistics).await;
@@ -160,10 +177,13 @@ pub trait Device: DeviceInterface {
         _last_run_statistics: &LastRunStatistics,
     ) -> Result<(), DeviceError> {
         let indicator = self.indicator_sender();
-        {
-            let _ = indicator.try_send(IndicatorState::RenderingImage);
-            let display = self.display().await?;
+        let watchdog = self.watchdog_sender();
 
+        let _ = indicator.try_send(IndicatorState::RenderingImage);
+        let _ = watchdog.try_send(5_000_000);
+        let display = self.display().await?;
+
+        {
             let mut frame_buffer = FrameBuffer::new(
                 Size::new(DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32),
                 E6Color::White,
@@ -173,9 +193,10 @@ pub trait Device: DeviceInterface {
                 &persistent_state.wifi_access_point_options,
                 &mut frame_buffer,
             )
-            .await?;
+                .await?;
 
             let _ = indicator.try_send(IndicatorState::UpdatingScreen);
+            let _ = watchdog.try_send(30_000_000);
             display.refresh(frame_buffer.as_bytes()).await?;
         }
 
@@ -185,12 +206,14 @@ pub trait Device: DeviceInterface {
         }
 
         let _ = indicator.try_send(IndicatorState::StartingWifiAccessPoint);
+        let _ = watchdog.try_send(5_000_000);
         self.init_network_stack(&persistent_state.wifi_access_point_network_config)
             .await?;
         self.start_wifi_ap(&persistent_state.wifi_access_point_options)
             .await?;
 
         let _ = indicator.try_send(IndicatorState::ConfigurationMode);
+        let _ = watchdog.try_send(10_000_000);
         let action_channel =
             make_static!(http::server::ActionChannel, crate::device::Channel::new());
         let seed = self.rand().await;
@@ -206,10 +229,14 @@ pub trait Device: DeviceInterface {
         info!("HTTP server started");
 
         loop {
-            use embassy_futures::select::{Either, select};
-
-            match select(action_channel.receive(), input_receiver.receive()).await {
-                Either::First(action) => {
+            match select3(
+                action_channel.receive(),
+                input_receiver.receive(),
+                Timer::after_secs(5),
+            )
+            .await
+            {
+                Either3::First(action) => {
                     info!("Received action: {:?}", action);
                     match action {
                         ServerAction::WriteState(state) => {
@@ -222,9 +249,12 @@ pub trait Device: DeviceInterface {
                         }
                     }
                 }
-                Either::Second(input) => {
+                Either3::Second(input) => {
                     info!("Received input: {:?}", input);
                     self.process_input(&input, persistent_state).await?;
+                }
+                Either3::Third(_) => {
+                    let _ = watchdog.try_send(10_000_000);
                 }
             }
         }

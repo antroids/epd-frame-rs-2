@@ -16,7 +16,7 @@ use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::Primitive;
 use embedded_graphics::primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable};
 use embedded_layout::align::horizontal;
-use embedded_layout::prelude::{Align, vertical};
+use embedded_layout::prelude::*;
 use embedded_layout::{View, ViewGroup};
 #[cfg(not(feature = "std"))]
 use micromath::F32Ext;
@@ -190,7 +190,7 @@ impl Drawable for WeatherIconBackground {
 
 impl Widget for WeatherIconBackground {}
 
-#[derive(ViewGroup, Clone)]
+#[derive(Clone)]
 pub struct IconValue16<'a> {
     icon: Icon<'a, Icon16>,
     text: Text<'a, BinaryFontStyleType>,
@@ -215,6 +215,20 @@ impl<'a> Drawable for IconValue16<'a> {
         self.icon.draw(target)?;
         self.text.draw(target)?;
         Ok(())
+    }
+}
+
+impl View for IconValue16<'_> {
+    fn translate_impl(&mut self, by: Point) {
+        self.icon.translate_impl(by);
+        self.text.translate_impl(by);
+    }
+
+    fn bounds(&self) -> Rectangle {
+        Rectangle::new(
+            self.icon.position,
+            self.icon.size() + (2 + self.text.size().width, 0).into(),
+        )
     }
 }
 
@@ -295,12 +309,13 @@ impl<'a> HourlyWeatherWidget<'a> {
         temperature_small
             .translate_mut((15, 114).into())
             .align_to_mut(&frame, horizontal::Center, vertical::NoAlignment);
-        let details_offset = 127;
-        apparent_temperature.translate_mut((4, details_offset).into());
-        wind_speed.translate_mut((4, details_offset + 18).into());
-        precipitation_probability.translate_mut((4, details_offset + 18 * 2).into());
-        humidity.translate_mut((4, details_offset + 18 * 3).into());
-        uv_index.translate_mut((4, details_offset + 18 * 4).into());
+
+        apparent_temperature
+            .translate_mut((4, 127).into())
+            .at_bottom_left(2, &mut wind_speed)
+            .at_bottom_left(2, &mut precipitation_probability)
+            .at_bottom_left(2, &mut humidity)
+            .at_bottom_left(2, &mut uv_index);
 
         Self {
             frame,
@@ -425,12 +440,13 @@ impl<'a> DailyWeatherWidget<'a> {
         temperature_small_secondary
             .translate_mut((35, 136).into())
             .align_to_mut(&frame, horizontal::Center, vertical::NoAlignment);
-        let details_offset = 147;
-        apparent_temperature.translate_mut((4, details_offset).into());
-        wind_speed.translate_mut((4, details_offset + 18).into());
-        precipitation_probability.translate_mut((4, details_offset + 18 * 2).into());
-        humidity.translate_mut((4, details_offset + 18 * 3).into());
-        uv_index_max.translate_mut((4, details_offset + 18 * 4).into());
+
+        apparent_temperature
+            .translate_mut((4, 147).into())
+            .at_bottom_left(2, &mut wind_speed)
+            .at_bottom_left(2, &mut precipitation_probability)
+            .at_bottom_left(2, &mut humidity)
+            .at_bottom_left(2, &mut uv_index_max);
 
         Self {
             frame,

@@ -58,6 +58,8 @@ pub trait DeviceInterface {
         &mut self,
         last_run_statistics: &LastRunStatistics,
     ) -> impl Future<Output = ()>;
+    fn watchdog_sender(&self) -> WatchdogFeedSender;
+    fn voltage(&self) -> Option<f32>;
 }
 
 #[derive(Clone, Copy)]
@@ -119,3 +121,8 @@ impl TryFrom<u8> for IndicatorState {
     }
 }
 
+const WATCHDOG_FEED_LEN: usize = 8;
+
+pub type WatchdogFeed = Channel<crate::RawMutex, u32, WATCHDOG_FEED_LEN>;
+pub type WatchdogFeedSender = Sender<'static, crate::RawMutex, u32, WATCHDOG_FEED_LEN>;
+pub type WatchdogFeedReceiver = Receiver<'static, crate::RawMutex, u32, WATCHDOG_FEED_LEN>;

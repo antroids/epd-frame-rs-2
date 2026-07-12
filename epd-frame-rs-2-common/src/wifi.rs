@@ -1,8 +1,9 @@
-use crate::types;
+use crate::{types, Validate};
 use crate::types::{ByteBool, LimitedString};
 use defmt::Format;
 use serde::Deserialize;
 use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
+use crate::errors::DeviceError;
 
 const MAX_SSID_LEN: usize = 32;
 const MAX_PASSPHRASE_LEN: usize = 64;
@@ -55,6 +56,17 @@ pub struct WifiJoinOptions {
     pub passphrase_is_prehashed: ByteBool,
 }
 
+impl Validate for WifiJoinOptions {
+    fn validate(&self) -> Result<(), DeviceError> {
+        let ssid = self.ssid.as_slice();
+        if ssid.is_empty() {
+            Err(DeviceError::NetworkConfigurationError(LimitedString::from_str("Access Point SSID cannot be empty")))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 #[derive(
     Copy,
     Clone,
@@ -72,6 +84,19 @@ pub struct WifiJoinOptions {
 pub struct WifiAccessPointOptions {
     pub ssid: LimitedString<MAX_SSID_LEN>,
     pub channel: u8,
+}
+
+impl Validate for WifiAccessPointOptions {
+    fn validate(&self) -> Result<(), DeviceError> {
+        let ssid = self.ssid.as_slice();
+        if ssid.is_empty() {
+            Err(DeviceError::NetworkConfigurationError(LimitedString::from_str("Access Point SSID cannot be empty")))
+        } else if self.channel < 1 || self.channel > 14 {
+            Err(DeviceError::NetworkConfigurationError(LimitedString::from_str("Access Point channel invalid")))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl Default for WifiAccessPointOptions {

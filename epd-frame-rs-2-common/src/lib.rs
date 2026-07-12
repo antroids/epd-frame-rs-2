@@ -14,7 +14,13 @@ pub mod scheduler;
 
 extern crate alloc;
 
+use crate::errors::DeviceError;
+
 #[cfg(not(feature = "std"))]
 pub type RawMutex = embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 #[cfg(feature = "std")]
 pub type RawMutex = embassy_sync::blocking_mutex::raw::NoopRawMutex;
+
+pub trait Validate {
+    fn validate(&self) -> Result<(), DeviceError>;
+}

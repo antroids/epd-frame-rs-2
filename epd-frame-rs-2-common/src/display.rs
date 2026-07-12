@@ -197,6 +197,7 @@ pub async fn draw_status_bar(
     weather: &Result<Weather, DeviceError>,
     task_scheduler: &HourlyScheduler,
     last_status: &LastRunStatistics,
+    battery_voltage: Option<f32>,
 ) -> Result<(), DeviceError> {
     let frame = Rectangle::new((5, 464).into(), (800, 16).into());
     let (connection_status, connection_status_color) = match weather {
@@ -218,6 +219,10 @@ pub async fn draw_status_bar(
         ),
     }
     .leak();
+    let battery_text = match battery_voltage {
+        None => "Bat: ?",
+        Some(v) => format!("Bat: {:.2}V", v).leak(),
+    };
     let connection_status = IconValue16::new(
         &Icon16::Wifi,
         connection_status,
@@ -232,10 +237,16 @@ pub async fn draw_status_bar(
                 .unwrap_or_default()
                 .x
                 + 5,
-            464,
+            frame.top_left.y,
+        ));
+    let battery = widgets::Text::new(battery_text, DEFAULT_FONT_10_STYLE, E6Color::Black)
+        .translate(Point::new(
+            frame.bottom_right().unwrap_or_default().x - 80,
+            frame.top_left.y + 12,
         ));
 
     connection_status.draw(draw_target)?;
     last_update.draw(draw_target)?;
+    battery.draw(draw_target)?;
     Ok(())
 }

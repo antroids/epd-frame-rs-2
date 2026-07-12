@@ -5,10 +5,7 @@ use embassy_time::{Duration, Timer};
 use embedded_graphics::prelude::*;
 use embedded_graphics_simulator::sdl2::MouseButton;
 use embedded_graphics_simulator::{OutputSettings, SimulatorDisplay, SimulatorEvent, Window};
-use epd_frame_rs_2_common::device::{
-    DOUBLE_CLICK_MS, Device, DeviceIndicator, DeviceIndicatorSender, DeviceInput,
-    DeviceInputReceiver, DeviceInputSender, DeviceInterface, Input, LONG_PRESS_MS,
-};
+use epd_frame_rs_2_common::device::{DOUBLE_CLICK_MS, Device, DeviceIndicator, DeviceIndicatorSender, DeviceInput, DeviceInputReceiver, DeviceInputSender, DeviceInterface, Input, LONG_PRESS_MS, WatchdogFeedSender, WatchdogFeed, WatchdogFeedReceiver};
 use epd_frame_rs_2_common::display::color::E6Color;
 use epd_frame_rs_2_common::display::epd_spectra_6::nibbles::Nibbles;
 use epd_frame_rs_2_common::display::epd_spectra_6::{DisplayDriver, Error};
@@ -35,6 +32,7 @@ pub struct SimulatorDevice {
     spawner: Spawner,
     input: &'static DeviceInput,
     indicator: &'static DeviceIndicator,
+    watchdog_sender: WatchdogFeedSender,
 }
 
 impl SimulatorDevice {
@@ -42,6 +40,8 @@ impl SimulatorDevice {
         let input = make_static!(DeviceInput::new());
         let indicator = make_static!(DeviceIndicator::new());
         let input_sender = input.sender();
+        let watchdog_feed = make_static!(WatchdogFeed::new());
+        let watchdog_sender = watchdog_feed.sender();
 
         Self {
             display: SimulatorDeviceDisplay::new(input_sender),
@@ -49,6 +49,7 @@ impl SimulatorDevice {
             spawner,
             input,
             indicator,
+            watchdog_sender,
         }
     }
 }
@@ -185,6 +186,14 @@ impl DeviceInterface for SimulatorDevice {
             .write_all(serde_json::to_vec(last_run_statistics).unwrap().as_slice())
             .unwrap();
     }
+
+    fn watchdog_sender(&self) -> WatchdogFeedSender {
+        self.watchdog_sender.clone()
+    }
+
+    fn voltage(&self) -> Option<f32> {
+        Some(5.0)
+    }
 }
 
 impl Device for SimulatorDevice {}
@@ -257,6 +266,13 @@ impl DisplayDriver for SimulatorDeviceDisplay {
 #[embassy_executor::task]
 async fn net_task(mut runner: embassy_net::Runner<'static, TunTapDevice>) -> ! {
     runner.run().await
+}
+
+#[embassy_executor::task]
+async fn watchdog_task(watchdog_receiver: WatchdogFeedReceiver) -> ! {
+    loop {
+        info!("Watchdog loaded with {:?} us", watchdog_receiver.receive().await);
+    }
 }
 
 struct ClickState {

@@ -4,19 +4,21 @@ use core::time::Duration;
 use defmt::{error, info, warn};
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_executor::Spawner;
+use embassy_futures::select::Either;
 use embassy_rp::peripherals::{DMA_CH0, DMA_CH1, DMA_CH2, DMA_CH3, PIO0, SPI1, TRNG};
 use embassy_rp::pio::InterruptHandler;
 use embassy_rp::pwm::SetDutyCycle;
 use embassy_rp::spi::Async;
 use embassy_rp::trng::Trng;
 use embassy_rp::watchdog::Watchdog;
-use embassy_rp::{bind_interrupts, dma, gpio, pac, pwm};
+use embassy_rp::{adc, bind_interrupts, dma, gpio, pac, pwm};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
 use embassy_time::{Delay, Timer};
 use epd_frame_rs_2_common::device::{
     Device, DeviceIndicator, DeviceIndicatorReceiver, DeviceIndicatorSender, DeviceInput,
-    DeviceInputReceiver, DeviceInterface, IndicatorState,
+    DeviceInputReceiver, DeviceInterface, IndicatorState, WatchdogFeed, WatchdogFeedReceiver,
+    WatchdogFeedSender,
 };
 use epd_frame_rs_2_common::errors::DeviceError;
 use epd_frame_rs_2_common::storage::{LastRunStatistics, PersistentState};
@@ -28,8 +30,6 @@ use static_cell::{StaticCell, make_static};
 
 const LAST_RUN_STATISTICS_OFFSET: u32 = 1024 * 4;
 const POWMAN_PASSWORD: u32 = 0x5AFE << 16;
-
-const WATCHDOG_TIMEOUT: embassy_time::Duration = embassy_time::Duration::from_secs(15);
 
 pub mod button;
 pub mod flash;
@@ -54,6 +54,8 @@ pub struct Rp235Device {
     spawner: Spawner,
     aon_timer: embassy_rp::aon_timer::AonTimer<'static>,
     display_pwr: gpio::Output<'static>,
+    watchdog_sender: WatchdogFeedSender,
+    vsys_voltage: Option<f32>,
 }
 
 impl DeviceInterface for Rp235Device {
@@ -77,7 +79,6 @@ impl DeviceInterface for Rp235Device {
         network_config: &NetworkConfig,
     ) -> Result<(), DeviceError> {
         let seed = self.rand().await;
-        self.feed_watchdog();
         self.network_stack
             .init_network_stack(seed, network_config)
             .await
@@ -95,7 +96,6 @@ impl DeviceInterface for Rp235Device {
         &mut self,
         wifi_access_point_options: &WifiAccessPointOptions,
     ) -> Result<(), DeviceError> {
-        self.disable_watchdog();
         self.network_stack
             .start_ap(&self.spawner, wifi_access_point_options)
             .await
@@ -110,7 +110,6 @@ impl DeviceInterface for Rp235Device {
     }
 
     async fn rand(&mut self) -> u64 {
-        self.feed_watchdog();
         self.trng.blocking_next_u64()
     }
 
@@ -118,7 +117,6 @@ impl DeviceInterface for Rp235Device {
         &mut self,
     ) -> Result<&mut impl epd_frame_rs_2_common::display::epd_spectra_6::DisplayDriver, DeviceError>
     {
-        self.feed_watchdog();
         Ok(&mut self.display)
     }
 
@@ -160,7 +158,6 @@ impl DeviceInterface for Rp235Device {
     }
 
     async fn power_off_radio_module(&mut self) -> Result<(), DeviceError> {
-        self.feed_watchdog();
         self.network_stack.deinitialize_network_stack();
         unsafe {
             let pwr = embassy_rp::peripherals::PIN_23::steal();
@@ -178,14 +175,24 @@ impl DeviceInterface for Rp235Device {
             .write_last_run_statistics(last_run_statistics)
             .await;
     }
+
+    fn watchdog_sender(&self) -> WatchdogFeedSender {
+        self.watchdog_sender.clone()
+    }
+    fn voltage(&self) -> Option<f32> {
+        self.vsys_voltage
+    }
 }
 
 impl Device for Rp235Device {}
 
 impl Rp235Device {
     pub async fn new(spawner: Spawner) -> Result<Self, DeviceError> {
+        set_usb_state(false);
+
         let peripherals = embassy_rp::init(Default::default());
-        let mut watchdog = Watchdog::new(peripherals.WATCHDOG);
+        let feed_task_watchdog = unsafe { Watchdog::new(peripherals.WATCHDOG.clone_unchecked()) };
+        let watchdog = Watchdog::new(peripherals.WATCHDOG);
 
         info!(
             "Config start: {}, length: {}",
@@ -203,6 +210,28 @@ impl Rp235Device {
             config_offset,
             config_offset + LAST_RUN_STATISTICS_OFFSET,
         );
+
+        let vsys_voltage = {
+            let mut adc = adc::Adc::new(peripherals.ADC, Irqs, adc::Config::default());
+            let _vsys_adc_pullup_pin = gpio::Output::new(
+                unsafe { peripherals.PIN_25.clone_unchecked() },
+                gpio::Level::High,
+            );
+            let mut vsys_sense_channel = adc::Channel::new_pin(
+                unsafe { peripherals.PIN_29.clone_unchecked() },
+                gpio::Pull::None,
+            );
+            adc
+                .read(&mut vsys_sense_channel).await
+                .ok()
+                .map(|v| v as f32 * 3f32 * 3.3f32 / (1 << 12) as f32)
+        };
+        pac::PADS_BANK0.gpio(29).modify(|r| {
+            r.set_pue(false);
+            r.set_pde(true);
+            r.set_ie(false);
+        });
+
         failsafe(&mut flash).await?;
         let network_stack = wifi::WifiStack::new(
             Irqs,
@@ -258,10 +287,15 @@ impl Rp235Device {
             },
         );
 
-        watchdog.pause_on_debug(true);
-        watchdog.start(WATCHDOG_TIMEOUT);
         button::spawn_button_task(button, device_input.sender(), &spawner)?;
         spawner.spawn(indicator_led(led, device_indicator.receiver())?);
+
+        let watchdog_feed = make_static!(WatchdogFeed::new());
+        let watchdog_sender = watchdog_feed.sender();
+        spawner.spawn(watchdog_feed_task(
+            watchdog_feed.receiver(),
+            feed_task_watchdog,
+        )?);
 
         Ok(Self {
             flash,
@@ -274,15 +308,9 @@ impl Rp235Device {
             spawner,
             aon_timer,
             display_pwr,
+            watchdog_sender,
+            vsys_voltage,
         })
-    }
-
-    fn feed_watchdog(&mut self) {
-        self.watchdog.feed(WATCHDOG_TIMEOUT);
-    }
-
-    fn disable_watchdog(&mut self) {
-        self.watchdog.stop();
     }
 
     fn disable_display(&mut self) {
@@ -312,7 +340,7 @@ fn low_power_mode() {
     pac::CLOCKS.clk_usb_ctrl().modify(|r| r.set_enabled(false));
     pac::CLOCKS.clk_peri_ctrl().modify(|r| r.set_enabled(false));
 
-    disable_usb();
+    set_usb_state(true);
     disable_gpio_pull();
 
     pac::POWMAN.state().modify(|r| {
@@ -325,19 +353,30 @@ fn low_power_mode() {
     }
 }
 
-fn disable_usb() {
-    pac::USB.usbphy_direct_override().modify(|r| {
-        r.set_rx_pd_override_en(true);
-        r.set_tx_pd_override_en(true);
-        r.set_dm_pulldn_en_override_en(true);
-        r.set_dp_pulldn_en_override_en(true);
+fn set_usb_state(disabled: bool) {
+    pac::USB.usbphy_direct().modify(|r| {
+        r.set_tx_pd(disabled);
+        r.set_rx_pd(disabled);
+        r.set_dm_pulldn_en(disabled);
+        r.set_dp_pulldn_en(disabled);
     });
 
-    pac::USB.usbphy_direct().modify(|r| {
-        r.set_tx_pd(true);
-        r.set_rx_pd(true);
-        r.set_dm_pulldn_en(true);
-        r.set_dp_pulldn_en(true);
+    pac::USB.usbphy_direct_override().modify(|r| {
+        r.set_rx_pd_override_en(disabled);
+        r.set_rx_dm_override_en(disabled);
+        r.set_rx_dd_override_en(disabled);
+        r.set_rx_dp_override_en(disabled);
+
+        r.set_tx_pd_override_en(disabled);
+        r.set_tx_dm_override_en(disabled);
+        r.set_tx_dp_override_en(disabled);
+        r.set_tx_dm_oe_override_en(disabled);
+        r.set_tx_dp_oe_override_en(disabled);
+        r.set_tx_diffmode_override_en(disabled);
+        r.set_tx_fsslew_override_en(disabled);
+
+        r.set_dm_pulldn_en_override_en(disabled);
+        r.set_dp_pulldn_en_override_en(disabled);
     });
 }
 
@@ -351,26 +390,13 @@ fn disable_gpio_pull() {
         });
     }
 }
-//
-// fn unlatch_gpio() {
-//     for gpio_index in 0..48 {
-//         pac::PADS_BANK0.gpio(gpio_index).modify(|r| {
-//             r.set_ie(true);
-//             r.set_od(false);
-//             r.set_pde(true);
-//             r.set_pue(false);
-//         });
-//     }
-// }
 
 fn store_indicator_state(state: IndicatorState) {
     pac::WATCHDOG.scratch7().write_value(state as u32);
 }
 
 fn read_indicator_state() -> IndicatorState {
-    (pac::WATCHDOG
-        .scratch7()
-        .read() as u8)
+    (pac::WATCHDOG.scratch7().read() as u8)
         .try_into()
         .unwrap_or_default()
 }
@@ -383,9 +409,15 @@ async fn failsafe(flash: &mut flash::Flash) -> Result<(), DeviceError> {
         IndicatorState::Off | IndicatorState::Error => {
             info!("Failsafe is not required");
         }
-        IndicatorState::Loading | IndicatorState::ReadingConfiguration | IndicatorState::JoiningWifi => {
-            error!("The failed execution probably caused by wrong configuration, resetting the configuration");
-            flash.write_persistent_state(&PersistentState::default()).await?;
+        IndicatorState::Loading
+        | IndicatorState::ReadingConfiguration
+        | IndicatorState::JoiningWifi => {
+            error!(
+                "The failed execution probably caused by wrong configuration, resetting the configuration"
+            );
+            flash
+                .write_persistent_state(&PersistentState::default())
+                .await?;
         }
         state => {
             error!(
@@ -409,6 +441,7 @@ bind_interrupts!(pub struct Irqs {
     TRNG_IRQ => embassy_rp::trng::InterruptHandler<TRNG>;
     DMA_IRQ_0 => dma::InterruptHandler<DMA_CH0>, dma::InterruptHandler<DMA_CH1>, dma::InterruptHandler<DMA_CH2>, dma::InterruptHandler<DMA_CH3>;
     POWMAN_IRQ_TIMER => embassy_rp::aon_timer::InterruptHandler;
+    ADC_IRQ_FIFO => adc::InterruptHandler;
 });
 
 #[embassy_executor::task]
@@ -420,5 +453,36 @@ async fn indicator_led(mut led: pwm::Pwm<'static>, receiver: DeviceIndicatorRece
         let duty_cycle_percent = new_indicator_state as u8;
 
         let _ = led.set_duty_cycle_percent(duty_cycle_percent);
+    }
+}
+
+#[embassy_executor::task]
+async fn watchdog_feed_task(feed_receiver: WatchdogFeedReceiver, mut watchdog: Watchdog) {
+    const WATCHDOG_LOAD_INTERVAL: u64 = 1_000_000;
+    const WATCHDOG_LOAD_INTERVAL_DURATION: embassy_time::Duration =
+        embassy_time::Duration::from_micros(WATCHDOG_LOAD_INTERVAL);
+    const WATCHDOG_MAX_TIMEOUT: u64 = 0xFFFFFF;
+    watchdog.start(embassy_time::Duration::from_micros(WATCHDOG_MAX_TIMEOUT));
+    let mut timer_left = WATCHDOG_MAX_TIMEOUT;
+    loop {
+        timer_left = match embassy_futures::select::select(
+            feed_receiver.receive(),
+            Timer::after(WATCHDOG_LOAD_INTERVAL_DURATION),
+        )
+        .await
+        {
+            Either::First(received) => received as u64,
+            Either::Second(_) => {
+                if timer_left > WATCHDOG_LOAD_INTERVAL {
+                    timer_left - WATCHDOG_LOAD_INTERVAL
+                } else {
+                    0
+                }
+            }
+        };
+        info!("Watchdog time left: {}", timer_left);
+        watchdog.feed(embassy_time::Duration::from_micros(
+            timer_left.min(WATCHDOG_MAX_TIMEOUT),
+        ));
     }
 }

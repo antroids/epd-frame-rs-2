@@ -1,6 +1,6 @@
-use alloc::borrow::Cow;
 use crate::display::color::{BinaryColorAdapter, E6Color};
 use crate::display::image::E6ImageSource;
+use alloc::borrow::Cow;
 use embedded_graphics::Drawable;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::{Dimensions, Point};
@@ -14,7 +14,14 @@ use embedded_layout::View;
 pub(crate) mod weather;
 
 #[allow(dead_code)]
-pub(crate) trait Widget: Drawable<Color = E6Color> + View {}
+pub(crate) trait Widget: Drawable<Color = E6Color> + View {
+    fn at_bottom_left<'a>(&self, padding: u32, next: &'a mut impl Widget) -> &'a mut impl Widget {
+        next.translate_mut(
+            self.bounds().top_left + Point::new(0, (self.size().height + padding) as i32),
+        );
+        next
+    }
+}
 
 #[derive(Clone)]
 pub struct Text<'a, S: Clone> {
@@ -105,8 +112,6 @@ impl<'a, I: E6ImageSource + Clone> Drawable for Icon<'a, I> {
 }
 
 impl<'a, I: E6ImageSource + Clone> Widget for Icon<'a, I> {}
-
-
 
 #[derive(Clone)]
 pub struct RoundWidgetBorder {

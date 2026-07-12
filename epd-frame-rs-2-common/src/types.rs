@@ -76,7 +76,8 @@ impl<const MAX_LEN: usize> LimitedString<MAX_LEN> {
     }
 
     pub fn as_slice(&self) -> &[u8] {
-        &self.str[..self.len.into()]
+        let len: usize = self.len.into();
+        &self.str[..len.min(MAX_LEN)]
     }
 
     pub fn as_utf8_str(&self) -> Result<&str, Utf8Error> {

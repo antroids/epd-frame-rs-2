@@ -19,7 +19,9 @@ pub enum DeviceError {
     DhcpServerError(LimitedString<128>),
     #[error("Network stack is not initialized")]
     NetworkStackNotInitialized,
-    #[error("Unable to spawn task {0:?}")]
+    #[error("Timer error {0:?}")]
+    NetworkConfigurationError(LimitedString<128>),
+    #[error("Invalid network configuration {0:?}")]
     TaskSpawnError(LimitedString<128>),
     #[error("Unable to join Wifi Network")]
     UnableToJoinWifiNetwork,

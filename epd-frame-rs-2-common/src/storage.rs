@@ -6,6 +6,8 @@ use crate::wifi::{NetworkConfig, WifiAccessPointOptions, WifiJoinOptions};
 use defmt::Format;
 use serde::{Deserialize, Serialize};
 use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
+use crate::errors::DeviceError;
+use crate::Validate;
 
 pub const VERSION: u16 = 0001;
 
@@ -38,6 +40,14 @@ impl Default for PersistentState {
             scheduler: Default::default(),
             weather_options: Default::default(),
         }
+    }
+}
+
+impl Validate for PersistentState {
+    fn validate(&self) -> Result<(), DeviceError> {
+        self.wifi_join_options.validate()?;
+        self.wifi_access_point_options.validate()?;
+        Ok(())
     }
 }
 
